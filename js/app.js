@@ -22,6 +22,7 @@ function fixSong(s) {
   const d = newSong();
   s.view = Object.assign(d.view, s.view || {});
   ['bpm', 'ts', 'tuning', 'tone', 'title', 'artist'].forEach(k => { if (s[k] === undefined) s[k] = d[k]; });
+  s.fx = Object.assign(d.fx, s.fx || {});
   if (!TUNINGS[s.tuning]) s.tuning = 'standard';
   if (!s.measures || !s.measures.length) s.measures = [newMeasure()];
   return s;
@@ -100,7 +101,7 @@ function commitPending() {
 
 function previewAt(mi, bi, s) {
   const n = noteAt(song.measures[mi].beats[bi], s);
-  if (n && !Player.isPlaying() && $('previewOn').checked) Player.preview(noteMidi(song, n), song.tone);
+  if (n && !Player.isPlaying() && $('previewOn').checked) Player.preview(noteMidi(song, n), song.tone, song.fx, song.bpm);
 }
 
 function moveRight() {
@@ -586,7 +587,7 @@ $('popup').addEventListener('click', e => {
   const n = curNote(), beat = curBeat(), m = song.measures[sel.mi];
   switch (act) {
     case 'close': closePopup(); break;
-    case 'listen': previewAt(sel.mi, sel.bi, sel.s); if (Player.isPlaying()) break; Player.preview(noteMidi(song, n), song.tone); break;
+    case 'listen': previewAt(sel.mi, sel.bi, sel.s); if (Player.isPlaying()) break; Player.preview(noteMidi(song, n), song.tone, song.fx, song.bpm); break;
     case 'setfret': { const v = parseInt($('pfret').value, 10); if (isNaN(v) || v < 0 || v > 24) return status('0~24 사이 숫자를 넣어주세요', true); mutate(() => { n.f = v; }); break; }
     case 'del': deleteNote(); break;
     case 'finger': mutate(() => { if (arg === 'none') delete n.fm; else n.fm = arg === 'T' ? 'T' : +arg; }); break;
@@ -628,6 +629,7 @@ function syncToolbar() {
   $('title').value = song.title; $('artist').value = song.artist;
   $('bpm').value = song.bpm; $('ts0').value = song.ts[0]; $('ts1').value = song.ts[1];
   $('tuning').value = song.tuning; $('tone').value = song.tone;
+  $('revOn').checked = !!song.fx.rev; $('revAmt').value = song.fx.revAmt; $('delOn').checked = !!song.fx.del; $('delAmt').value = song.fx.delAmt; $('delTime').value = song.fx.delTime;
   $('vFingers').classList.toggle('on', !!song.view.fingers);
   $('vPicks').classList.toggle('on', !!song.view.picks);
   $('vNames').checked = !!song.view.names; $('vFnums').checked = !!song.view.fingerNums;
@@ -654,7 +656,20 @@ $('bpm').addEventListener('change', e => mutate(() => { song.bpm = Math.max(20, 
 $('ts0').addEventListener('change', e => mutate(() => { song.ts = [+$('ts0').value, +$('ts1').value]; }));
 $('ts1').addEventListener('change', e => mutate(() => { song.ts = [+$('ts0').value, +$('ts1').value]; }));
 $('tuning').addEventListener('change', e => mutate(() => { song.tuning = e.target.value; syncToolbar(); }));
-$('tone').addEventListener('change', e => { mutate(() => { song.tone = e.target.value; }); });
+$('tone').addEventListener('change', e => { mutate(() => { song.tone = e.target.value; }); Player.setTone(song.tone); toneDemo(); });
+// 리버브 / 딜레이 (재생 중에도 바로 바뀜)
+function readFx() {
+  song.fx = { rev: $('revOn').checked, revAmt: +$('revAmt').value, del: $('delOn').checked, delAmt: +$('delAmt').value, delTime: $('delTime').value };
+  Player.setFx(song.fx, song.bpm * ((+$('speed').value || 100) / 100)); autosave();
+}
+['revOn', 'delOn', 'delTime'].forEach(id => $(id).addEventListener('change', () => { readFx(); toneDemo(); }));
+['revAmt', 'delAmt'].forEach(id => { $(id).addEventListener('input', readFx); $(id).addEventListener('change', toneDemo); });
+// 톤을 바꾸면 짧게 들려주기 (재생 중이 아닐 때)
+function toneDemo() {
+  if (Player.isPlaying()) return;
+  const t = TUNINGS[song.tuning].midi;
+  [t[5] + 0, t[4] + 2, t[3] + 2].forEach(m => Player.preview(m, song.tone, song.fx, song.bpm));
+}
 document.querySelectorAll('[data-dur]').forEach(x => x.addEventListener('click', () => setDur(+x.dataset.dur)));
 $('bDot').onclick = () => toggleBeat('dot');
 $('bTrip').onclick = () => toggleBeat('trip');
@@ -687,6 +702,16 @@ $('bHelp').onclick = openHelp;
 $('helpClose').onclick = () => $('helpModal').classList.add('hidden');
 $('helpModal').onclick = e => { if (e.target.id === 'helpModal') $('helpModal').classList.add('hidden'); };
 $('bGrace').onclick = () => toggleBeat('grace');
+// 위 메뉴 숨기기/보이기 (휴대폰에서 악보를 넓게)
+function setMenuHidden(h) {
+  document.body.classList.toggle('menu-hidden', h);
+  $('bMenu').textContent = h ? '☰ 메뉴' : '▴';
+  $('bMenu').title = h ? '메뉴 다시 보이기' : '위 메뉴 숨기기 (악보를 넓게 보기)';
+  try { localStorage.setItem('gtab-menu', h ? '1' : '0'); } catch (e) { }
+  setTimeout(() => keepCursorVisible && render(), 0);
+}
+$('bMenu').onclick = e => { e.stopPropagation(); setMenuHidden(!document.body.classList.contains('menu-hidden')); };
+(function () { let h = null; try { h = localStorage.getItem('gtab-menu'); } catch (e) { } if (h === '1') setMenuHidden(true); })();
 $('minfo').onclick = e => { e.stopPropagation(); openPopup('measure', $('minfo')); };
 $('vTeach').checked = teachOn();
 $('vTeach').onchange = e => { try { localStorage.setItem('gtab-teach', e.target.checked ? '1' : '0'); } catch (er) { } render(); };

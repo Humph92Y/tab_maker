@@ -27,6 +27,7 @@ function newSong() {
   return {
     version: 1, title: '제목 없음', artist: '', bpm: 100, ts: [4, 4], tuning: 'standard', tone: 'clean',
     view: { fingers: false, picks: false, names: false, fingerNums: false, perLine: 4 },
+    fx: { rev: true, revAmt: 25, del: false, delAmt: 30, delTime: '8d' },
     measures: Array.from({ length: 8 }, newMeasure),
   };
 }

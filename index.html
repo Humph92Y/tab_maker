@@ -18,6 +18,7 @@
 <header id="toolbar" class="no-print">
   <div class="tabbar">
     <span class="logo">🎸 타브 메이커</span>
+    <button id="bMenu" class="qa menubtn" title="위 메뉴 숨기기 / 다시 보이기">▴</button>
     <div class="tabs">
     <button class="tab" data-tab="file">파일</button>
     <button class="tab" data-tab="input">입력</button>
@@ -135,12 +136,18 @@
     <div class="rg"><div class="rb col">
       <label>속도 <input id="speed" type="range" min="25" max="150" step="5" value="100"> <span id="speedVal">100%</span></label>
       <label>톤 <select id="tone">
-        <option value="clean">클린</option>
-        <option value="distortion">디스토션</option>
-        <option disabled>오버드라이브 (준비 중)</option>
-        <option disabled>어쿠스틱 (준비 중)</option>
+        <option value="clean">클린 (깨끗한 일렉)</option>
+        <option value="crunch">크런치 (살짝 거친)</option>
+        <option value="overdrive">오버드라이브 (따뜻하게 찌그러짐)</option>
+        <option value="distortion">디스토션 (강하게 찌그러짐)</option>
+        <option value="acoustic">어쿠스틱 (통기타)</option>
       </select></label>
     </div><div class="rl">소리</div></div>
+    <div class="rg"><div class="rb col">
+      <label title="방 안에서 울리는 듯한 공간감"><input type="checkbox" id="revOn" checked> 리버브 <input id="revAmt" type="range" min="0" max="100" value="25" class="fxr"></label>
+      <label title="메아리처럼 소리가 반복돼요"><input type="checkbox" id="delOn"> 딜레이 <input id="delAmt" type="range" min="0" max="100" value="30" class="fxr">
+        <select id="delTime" title="메아리 간격 (곡 빠르기에 맞춤)"><option value="8">8분</option><option value="8d" selected>점8분</option><option value="4">4분</option></select></label>
+    </div><div class="rl">효과 (선택)</div></div>
     <div class="rg"><div class="rb col">
       <label><input type="checkbox" id="metroOn"> 메트로놈</label>
       <label><input type="checkbox" id="countIn"> 시작 전 카운트</label>

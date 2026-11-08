@@ -291,3 +291,12 @@ body.touch #pad { padding: 4px 5px; }
   body.touch #pad button[data-fret] { height: 40px; font-size: 15px; }
   body.touch #pad .padrow:not(#padNums) button { height: 40px; font-size: 14px; padding: 0 10px; }
 }
+.fxr { width: 80px; } body.touch .fxr { width: 100px; }
+/* 위 메뉴 숨기기 */
+.menubtn { margin: 0 6px 4px 0; padding: 4px 9px; flex-shrink: 0; font-weight: 700; }
+body.menu-hidden .tabs, body.menu-hidden .ribbon.on { display: none; }
+body.menu-hidden .tabbar { padding-bottom: 4px; }
+body.menu-hidden .tabbar .spacer { flex: 1; }
+body.menu-hidden .menubtn { margin-bottom: 0; }
+body.menu-hidden .tabbar .big, body.menu-hidden .tabbar .qa { margin-bottom: 0; }
+@media (max-width: 700px) { .tabbar .menubtn { display: inline-block; } }

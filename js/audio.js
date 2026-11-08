@@ -3,11 +3,21 @@
 // 인터넷 연결 없이, 저작권 걱정 없이 재생됨. 슬라이드/벤딩은 실제로 음높이가 이동함.
 
 const Player = (() => {
-  let ctx = null, input, cleanOut, distIn, master, reverbSend;
+  let ctx = null, input, master, reverbSend, reverbRet, delaySend, delayNode, delayFb, delayRet;
+  let tones = {}, curTone = 'clean', curFx = null;
   const bufCache = {};
   let sources = [], timers = [], playing = false;
   let passes = []; // {start, beats:[{id,t,d}], end}
   let onStop = null;
+
+  // 톤 프리셋: 앰프에 넣는 게인(pre), 찌그러짐 정도(k), 미드 강조, 캐비닛 고음 컷, 최종 볼륨(post)
+  const TONE_PRESETS = {
+    clean: { pre: 1, k: 0, hp: 60, mid: [800, 1, 0.8], cab: 6500, post: 0.9 },
+    crunch: { pre: 5, k: 7, hp: 90, mid: [750, 3, 0.8], cab: 5000, post: 0.42 },
+    overdrive: { pre: 12, k: 20, hp: 170, mid: [900, 6, 0.9], cab: 4400, post: 0.24 },
+    distortion: { pre: 28, k: 60, hp: 110, mid: [800, 4, 0.8], cab: 4200, post: 0.16 },
+    acoustic: { acoustic: true, post: 0.95 },
+  };
 
   function init() {
     if (ctx) return;
@@ -16,31 +26,67 @@ const Player = (() => {
     const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 4;
     master.connect(comp); comp.connect(ctx.destination);
     // 리버브(공간감)
-    const conv = ctx.createConvolver(); conv.buffer = makeImpulse(1.6);
-    reverbSend = ctx.createGain(); reverbSend.gain.value = 0.18;
-    reverbSend.connect(conv); conv.connect(master);
+    const conv = ctx.createConvolver(); conv.buffer = makeImpulse(2.2);
+    reverbSend = ctx.createGain(); reverbRet = ctx.createGain(); reverbRet.gain.value = 0;
+    reverbSend.connect(conv); conv.connect(reverbRet); reverbRet.connect(master);
+    // 딜레이(메아리): 박자에 맞춘 시간, 되먹임으로 몇 번 반복
+    delaySend = ctx.createGain(); delayNode = ctx.createDelay(2.0); delayFb = ctx.createGain(); delayRet = ctx.createGain(); delayRet.gain.value = 0;
+    const dTone = ctx.createBiquadFilter(); dTone.type = 'lowpass'; dTone.frequency.value = 3200;
+    delaySend.connect(delayNode); delayNode.connect(dTone); dTone.connect(delayFb); delayFb.connect(delayNode);
+    dTone.connect(delayRet); delayRet.connect(master); delayRet.connect(reverbSend);
     input = ctx.createGain();
-    // 클린 톤
-    cleanOut = ctx.createBiquadFilter(); cleanOut.type = 'lowpass'; cleanOut.frequency.value = 6500;
-    const cleanG = ctx.createGain(); cleanG.gain.value = 0.9;
-    cleanOut.connect(cleanG); cleanG.connect(master); cleanG.connect(reverbSend);
-    // 디스토션 톤: 게인 → 클리핑 → 앰프/캐비닛 느낌 필터
-    distIn = ctx.createBiquadFilter(); distIn.type = 'highpass'; distIn.frequency.value = 110;
-    const pre = ctx.createGain(); pre.gain.value = 28;
-    const shaper = ctx.createWaveShaper(); shaper.curve = distCurve(60); shaper.oversample = '4x';
-    const mid = ctx.createBiquadFilter(); mid.type = 'peaking'; mid.frequency.value = 800; mid.gain.value = 4; mid.Q.value = 0.8;
-    const cab = ctx.createBiquadFilter(); cab.type = 'lowpass'; cab.frequency.value = 4200; cab.Q.value = 0.9;
-    const cab2 = ctx.createBiquadFilter(); cab2.type = 'lowpass'; cab2.frequency.value = 6000;
-    const post = ctx.createGain(); post.gain.value = 0.16;
-    distIn.connect(pre); pre.connect(shaper); shaper.connect(mid); mid.connect(cab); cab.connect(cab2); cab2.connect(post);
-    post.connect(master); post.connect(reverbSend);
+    for (const k in TONE_PRESETS) tones[k] = buildTone(TONE_PRESETS[k]);
     setTone('clean');
+    setFx(null);
+  }
+
+  function buildTone(p) {
+    const out = ctx.createGain(); out.gain.value = p.post;
+    out.connect(master); out.connect(reverbSend); out.connect(delaySend);
+    if (p.acoustic) {
+      // 어쿠스틱: 찌그러짐 없이, 나무 몸통 울림(저음) + 줄의 반짝임(고음)
+      const body = ctx.createBiquadFilter(); body.type = 'peaking'; body.frequency.value = 110; body.gain.value = 6; body.Q.value = 1.2;
+      const box = ctx.createBiquadFilter(); box.type = 'peaking'; box.frequency.value = 400; box.gain.value = -3; box.Q.value = 1;
+      const pres = ctx.createBiquadFilter(); pres.type = 'peaking'; pres.frequency.value = 2600; pres.gain.value = 4; pres.Q.value = 0.9;
+      const air = ctx.createBiquadFilter(); air.type = 'highshelf'; air.frequency.value = 6000; air.gain.value = 5;
+      body.connect(box); box.connect(pres); pres.connect(air); air.connect(out);
+      return { in: body, acoustic: true };
+    }
+    const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = p.hp;
+    let last = hp;
+    if (p.k > 0) {
+      const pre = ctx.createGain(); pre.gain.value = p.pre;
+      const shaper = ctx.createWaveShaper(); shaper.curve = distCurve(p.k); shaper.oversample = '4x';
+      hp.connect(pre); pre.connect(shaper); last = shaper;
+    }
+    const mid = ctx.createBiquadFilter(); mid.type = 'peaking'; mid.frequency.value = p.mid[0]; mid.gain.value = p.mid[1]; mid.Q.value = p.mid[2];
+    const cab = ctx.createBiquadFilter(); cab.type = 'lowpass'; cab.frequency.value = p.cab; cab.Q.value = p.k > 0 ? 0.9 : 0.7;
+    last.connect(mid); mid.connect(cab);
+    if (p.k > 0) { const cab2 = ctx.createBiquadFilter(); cab2.type = 'lowpass'; cab2.frequency.value = p.cab * 1.4; cab.connect(cab2); cab2.connect(out); }
+    else cab.connect(out);
+    return { in: hp };
   }
 
   function setTone(t) {
     if (!ctx) return;
+    if (!tones[t]) t = 'clean';
+    curTone = t;
     input.disconnect();
-    input.connect(t === 'distortion' ? distIn : cleanOut);
+    input.connect(tones[t].in);
+  }
+
+  // fx = { rev: 켜기, revAmt: 0~100, del: 켜기, delAmt: 0~100, delTime: '8'|'8d'|'4' }, bpm
+  function setFx(fx, bpm) {
+    if (!ctx) { curFx = fx; return; }
+    fx = fx || { rev: true, revAmt: 25, del: false, delAmt: 30, delTime: '8d' };
+    curFx = fx;
+    const now = ctx.currentTime;
+    reverbRet.gain.setTargetAtTime(fx.rev ? (fx.revAmt / 100) * 0.9 : 0, now, 0.03);
+    const spq = 60 / (bpm || 100);
+    const dt = Math.min(1.9, fx.delTime === '4' ? spq : fx.delTime === '8' ? spq / 2 : spq * 0.75);
+    delayNode.delayTime.setTargetAtTime(dt, now, 0.02);
+    delayFb.gain.setTargetAtTime(fx.del ? 0.25 + fx.delAmt / 100 * 0.3 : 0, now, 0.03);
+    delayRet.gain.setTargetAtTime(fx.del ? fx.delAmt / 100 * 0.7 : 0, now, 0.03);
   }
 
   function distCurve(k) {
@@ -56,16 +102,18 @@ const Player = (() => {
 
   // Karplus-Strong 줄 소리 만들기
   function getBuf(midi) {
-    if (bufCache[midi]) return bufCache[midi];
+    const ac = curTone === 'acoustic';
+    const key = midi + (ac ? 'a' : '');
+    if (bufCache[key]) return bufCache[key];
     const sr = ctx.sampleRate, f = 440 * Math.pow(2, (midi - 69) / 12);
     const dur = midi < 52 ? 4.5 : midi < 64 ? 3.5 : 2.6;
     const len = Math.floor(sr * dur);
     const N = Math.max(2, Math.round(sr / f - 0.5));
     const line = new Float32Array(N);
     for (let i = 0; i < N; i++) line[i] = Math.random() * 2 - 1;
-    for (let i = 0; i < N; i++) line[i] = (line[i] + line[(i + 1) % N]) * 0.5; // 살짝 부드럽게
+    if (!ac) for (let i = 0; i < N; i++) line[i] = (line[i] + line[(i + 1) % N]) * 0.5; // 살짝 부드럽게 (어쿠스틱은 더 밝게)
     let mean = 0; for (let i = 0; i < N; i++) mean += line[i]; mean /= N; for (let i = 0; i < N; i++) line[i] -= mean;
-    const rho = Math.pow(0.001, 1 / (sr * 7));
+    const rho = Math.pow(0.001, 1 / (sr * (ac ? 5 : 7)));
     const data = new Float32Array(len);
     let p = 0;
     for (let n = 0; n < len; n++) {
@@ -75,15 +123,15 @@ const Player = (() => {
       p = nx;
     }
     // 피킹 위치 효과
-    const pd = Math.max(1, Math.round(N * 0.18));
+    const pd = Math.max(1, Math.round(N * (ac ? 0.12 : 0.18)));
     for (let n = len - 1; n >= pd; n--) data[n] -= 0.35 * data[n - pd];
     let peak = 0; for (let n = 0; n < len; n++) peak = Math.max(peak, Math.abs(data[n]));
     const fade = Math.floor(sr * 0.08);
     for (let n = 0; n < len; n++) { data[n] = data[n] / peak * 0.5; if (n > len - fade) data[n] *= (len - n) / fade; }
     const ab = ctx.createBuffer(1, len, sr); ab.copyToChannel ? ab.copyToChannel(data, 0) : ab.getChannelData(0).set(data);
     const actual = sr / (N + 0.5);
-    bufCache[midi] = { buf: ab, corr: f / actual };
-    return bufCache[midi];
+    bufCache[key] = { buf: ab, corr: f / actual };
+    return bufCache[key];
   }
 
   // 하나의 '울림'(같은 줄에서 레가토로 이어지는 음들 포함) 재생
@@ -211,7 +259,7 @@ const Player = (() => {
   function play(song, opts, stopCb) {
     init(); stop(true);
     if (ctx.state === 'suspended') ctx.resume();
-    setTone(song.tone);
+    setTone(song.tone); setFx(song.fx, song.bpm * opts.speed);
     playing = true; onStop = stopCb;
     let t = ctx.currentTime + 0.15;
     if (opts.countIn) {
@@ -249,11 +297,11 @@ const Player = (() => {
     return null;
   }
 
-  function preview(midi, tone) {
-    init(); if (ctx.state === 'suspended') ctx.resume(); setTone(tone);
+  function preview(midi, tone, fx, bpm) {
+    init(); if (ctx.state === 'suspended') ctx.resume(); setTone(tone); if (fx !== undefined) setFx(fx, bpm);
     const t = ctx.currentTime + 0.02;
     voice({ t0: t, t1: t + 0.9, midi, events: [], vel: 0.5, startSemi: 0 });
   }
 
-  return { play, stop, currentBeat, preview, isPlaying: () => playing };
+  return { play, stop, currentBeat, preview, setFx: (fx, bpm) => { if (ctx) setFx(fx, bpm); }, setTone: t => { if (ctx) setTone(t); }, isPlaying: () => playing };
 })();
