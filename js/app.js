@@ -980,7 +980,7 @@ $('pdfInput').onchange = async e => {
     alert(`✅ PDF 인식 완료\n\n제목: ${song.title}\n마디: ${song.measures.length}개\n빠르기: ${song.bpm} BPM\n\n${chk ? `⚠ 주황색 마디 번호(${chk}개)는 박자 합이 안 맞거나 일부 길이를 추측한 곳이에요.\n원본에서 읽은 길이는 그대로 두었으니, 원본과 비교해서 필요하면 고쳐 주세요.` : '모든 마디의 박자가 맞아요.'}\n\n(되돌리려면 Ctrl+Z)`);
   } catch (err) {
     console.error(err);
-    const msg = err && err.message === 'NO_TAB' ? '이 PDF에서 타브(6줄) 악보를 찾지 못했어요.\n스캔하거나 사진으로 찍은 PDF는 아직 인식할 수 없어요.\n(Guitar Pro, MuseScore 등에서 내보낸 PDF는 인식돼요)' : '이 PDF를 읽지 못했어요. (' + (err && err.message) + ')';
+    const msg = err && err.message === 'SCANNED' ? '이 PDF는 악보가 사진(그림)으로 들어 있어요. (스캔·사진 PDF)\n지금은 글자·선으로 된 PDF만 정확히 읽을 수 있어요.\nGuitar Pro, MuseScore 등에서 "PDF로 내보내기"한 파일을 써 주세요.' : err && err.message === 'NO_TAB' ? '이 PDF에서 타브(6줄) 악보를 찾지 못했어요.\n스캔하거나 사진으로 찍은 PDF는 아직 인식할 수 없어요.\n(Guitar Pro, MuseScore 등에서 내보낸 PDF는 인식돼요)' : '이 PDF를 읽지 못했어요. (' + (err && err.message) + ')';
     alert(msg); status('PDF 인식 실패', true);
   } finally { busy.classList.add('hidden'); }
 };
