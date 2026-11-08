@@ -187,25 +187,67 @@ function suggestRhythm(song, mi, opts) {
   return /같은 리듬/.test(pick.label) ? 'copy' : 'fit';
 }
 
-// ===== 피킹 자동 추천 (교대 피킹: 박의 위치 기준) =====
-// 기타 교본의 기본 원칙: 손목은 리듬에 맞춰 계속 위/아래로 움직이고,
-// 정박(앞)은 다운(⊓), 엇박(뒤)은 업(V). 해머/풀/슬라이드/붙임줄로 이어지는 음은 피킹하지 않음.
+// ===== 피킹 자동 추천 =====
+// 1단계: 실제로 오른손이 줄을 치는 "어택"만 고름
+//   - 쉼표, 붙임줄로 이어지는 음, 해머/풀/슬라이드(sl.)로 이어지는 도착음은 어택이 아님
+//   - 화음(동시에 치는 음)은 어택 1번 (음 개수만큼 번갈아 치지 않음)
+//   - 고스트·데드·스타카토 음도 치는 음이므로 어택
+// 2단계: 방향 정하기 (song.view.pickMode)
+//   - 'rhythm' (기본): 손목은 박자에 맞춰 계속 위/아래로 움직이고, 박의 앞은 ⊓ 다운, 뒤는 V 업.
+//     한 박 안의 가장 잘게 쪼갠 단위(8분/16분/셋잇단/32분)를 기준으로 하고, 쉼표·붙임줄 자리도 손은 계속 움직임
+//   - 'strict': 어택마다 무조건 번갈아 (⊓ V ⊓ V). 쉼표·붙임줄·레가토는 차례를 넘기지 않음
+// 직접 입력한 피킹(b.pick)은 절대 바꾸지 않음. 추천은 b.pa 에만 저장.
+// strict 모드에서는 직접 입력한 피킹 다음부터 그 반대 방향으로 이어감.
 function gcd(a, b) { a = Math.round(a); b = Math.round(b); while (b) { [a, b] = [b, a % b]; } return a; }
-function suggestPicking(song) {
+function isAttack(song, mi, bi) {
+  const b = song.measures[mi].beats[bi];
+  if (isRest(b)) return false;
+  return !b.notes.every(n => isLegatoTarget(song, mi, bi, n));
+}
+// 박(손목 한 번 왕복의 틀) 길이: x/4 = 4분음표, 6/8·9/8·12/8 = 점4분음표, 그 밖의 x/8 = 8분음표, x/2 = 2분음표
+function pickBeatLen(ts) { return ts[1] === 8 && ts[0] % 3 === 0 && ts[0] > 3 ? 720 : 1920 / ts[1]; }
+// 한 박 안에서 어택들이 놓이는 가장 굵은 칸 (8분 → 16분 → 셋잇단 → 32분 …)
+function pickGrid(offsets, beatLen) {
+  const cands = [240, 120, 160, 60, 80, 40, 30].filter(g => g <= beatLen && beatLen % g === 0);
+  for (const g of cands) if (offsets.every(o => Math.abs(o / g - Math.round(o / g)) < 1e-6)) return g;
+  return 0;
+}
+function pickPlan(song, mode) {
+  mode = mode || (song.view && song.view.pickMode) || 'rhythm';
+  const out = [];
+  let next = 'd';
   song.measures.forEach((m, mi) => {
-    let g = 240, t = 0;
-    m.beats.forEach(b => { if (!isRest(b)) g = gcd(g, t); t += beatTicks(b); });
-    if (g < 60) g = 60;
-    t = 0;
-    m.beats.forEach((b, bi) => {
-      b.pa = null;
-      if (!isRest(b)) {
-        const allLegato = b.notes.every(n => isLegatoTarget(song, mi, bi, n));
-        if (!allLegato) b.pa = (Math.round(t / g) % 2 === 0) ? 'd' : 'u';
-      }
-      t += beatTicks(b);
-    });
+    // 못갖춘마디(첫 마디만 짧고 다음 마디부터 원래 박자): 마디 끝이 박에 맞도록 시작 위치를 뒤로 미룸
+    const n1 = song.measures[1];
+    const pickup = mi === 0 && m.ts && n1 && n1.ts && measureCapacity(m.ts) < measureCapacity(n1.ts);
+    const ts = pickup ? n1.ts : measureTs(song, mi), bl = pickBeatLen(ts);
+    const shift = pickup ? measureCapacity(n1.ts) - measureCapacity(m.ts) : 0;
+    let t = 0;
+    const ev = m.beats.map((b, bi) => { const e = { mi, bi, t, attack: isAttack(song, mi, bi), manual: b.pick || null }; t += beatTicks(b); return e; });
+    if (mode === 'strict') {
+      ev.forEach(e => {
+        if (!e.attack) { e.dir = null; return; }
+        e.dir = e.manual || next;
+        next = e.dir === 'd' ? 'u' : 'd';
+      });
+    } else {
+      // 박마다 어택 위치로 칸 크기를 정하고, 칸 번호가 짝수 = 다운, 홀수 = 업
+      const byBeat = new Map();
+      ev.forEach(e => { if (!e.attack) return; const k = Math.floor((e.t + shift + 1e-6) / bl); if (!byBeat.has(k)) byBeat.set(k, []); byBeat.get(k).push(e); });
+      byBeat.forEach((list, k) => {
+        const offs = list.map(e => e.t + shift - k * bl);
+        const g = pickGrid(offs, bl);
+        if (g) list.forEach((e, i) => { e.dir = Math.round(offs[i] / g) % 2 === 0 ? 'd' : 'u'; });
+        else list.forEach((e, i) => { e.dir = i % 2 === 0 ? 'd' : 'u'; }); // 칸을 못 정하면 그 박 안에서만 번갈아
+      });
+      ev.forEach(e => { if (!e.attack) e.dir = null; });
+    }
+    ev.forEach(e => out.push(e));
   });
+  return out;
+}
+function suggestPicking(song, mode) {
+  pickPlan(song, mode).forEach(e => { song.measures[e.mi].beats[e.bi].pa = e.dir; });
 }
 
 function cloneSong(s) { return JSON.parse(JSON.stringify(s)); }

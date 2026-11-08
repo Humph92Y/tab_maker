@@ -724,6 +724,7 @@ function syncToolbar() {
   $('revOn').checked = !!song.fx.rev; $('revAmt').value = song.fx.revAmt; $('delOn').checked = !!song.fx.del; $('delAmt').value = song.fx.delAmt; $('delTime').value = song.fx.delTime;
   $('vFingers').classList.toggle('on', !!song.view.fingers);
   $('vPicks').classList.toggle('on', !!song.view.picks);
+  $('pickMode').value = song.view.pickMode || 'rhythm';
   $('vNames').checked = !!song.view.names; $('vFnums').checked = !!song.view.fingerNums;
   $('perLine').value = String(song.view.perLine || 0);
   $('printSub').textContent = [`♩ = ${song.bpm}`, `튜닝: ${TUNINGS[song.tuning].name}`].filter(Boolean).join('   ·   ');
@@ -814,6 +815,10 @@ $('theoryModal').onclick = e => { if (e.target.id === 'theoryModal') $('theoryMo
 $('bMeasure').onclick = () => { if (pending) commitPending(); pending = ''; splitMeasure(); };
 $('bUndo').onclick = undo; $('bRedo').onclick = redo;
 $('vFingers').onclick = () => mutate(() => { song.view.fingers = !song.view.fingers; if (!song.view.fingers) song.measures.forEach(m => m.beats.forEach(b => b.notes.forEach(n => delete n.fa))); syncToolbar(); status(song.view.fingers ? '앞뒤 음을 모두 보고 가장 편한 손가락을 색으로 표시했어요. 숫자를 눌러 직접 바꿀 수도 있어요' : '운지 추천을 껐어요 (직접 칠한 색은 남아요)'); });
+$('pickMode').onchange = e => mutate(() => {
+  song.view.pickMode = e.target.value; song.view.picks = true; syncToolbar();
+  status(e.target.value === 'strict' ? '피킹 추천: 치는 음마다 ⊓V⊓V 번갈아 (쉼표·붙임줄·해머/풀은 건너뜀)' : '피킹 추천: 박자 맞춤 (정박 ⊓ 다운, 엇박 V 업, 쉼표 자리도 손은 계속 움직임)');
+});
 $('vPicks').onclick = () => mutate(() => { song.view.picks = !song.view.picks; if (!song.view.picks) song.measures.forEach(m => m.beats.forEach(b => delete b.pa)); syncToolbar(); status(song.view.picks ? '박자 위치에 맞춰 ⊓(다운)/V(업)를 추천했어요. 파란색 = 추천, 위 칸을 누르면 직접 입력' : '피킹 추천을 껐어요'); });
 $('vNames').onchange = e => mutate(() => { song.view.names = e.target.checked; });
 $('vFnums').onchange = e => mutate(() => { song.view.fingerNums = e.target.checked; });
