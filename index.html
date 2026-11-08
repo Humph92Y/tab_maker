@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>기타 타브 메이커</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header id="toolbar" class="no-print">
+  <div class="tabbar">
+    <span class="logo">🎸 타브 메이커</span>
+    <button class="tab" data-tab="file">파일</button>
+    <button class="tab" data-tab="input">입력</button>
+    <button class="tab" data-tab="tech">주법</button>
+    <button class="tab" data-tab="song">곡 설정</button>
+    <button class="tab" data-tab="play">재생</button>
+    <button class="tab" data-tab="assist">도우미</button>
+    <button class="tab" data-tab="help">도움말</button>
+    <span class="spacer"></span>
+    <button id="bUndo" class="qa" title="되돌리기 (Ctrl+Z)">↶</button>
+    <button id="bRedo" class="qa" title="다시 실행 (Ctrl+Y)">↷</button>
+    <button id="bPlay" class="big" title="재생 / 정지 (Space)">▶ 재생</button>
+  </div>
+
+  <div class="ribbon" data-panel="file">
+    <div class="rg"><div class="rb">
+      <button id="bNew" class="tall"><span class="ic">📄</span>새 악보</button>
+      <button id="bOpen" class="tall"><span class="ic">📂</span>열기</button>
+      <button id="bSave" class="tall" title="Ctrl+S"><span class="ic">💾</span>저장</button>
+    </div><div class="rl">파일</div></div>
+    <div class="rg"><div class="rb">
+      <button id="bImportPdf" class="tall" title="Guitar Pro / MuseScore 등으로 만든 PDF 악보를 자동 인식"><span class="ic">📥</span>PDF 악보 불러오기</button>
+    </div><div class="rl">자동 인식</div></div>
+    <div class="rg"><div class="rb">
+      <button id="bPdf" class="tall" title="Ctrl+P"><span class="ic">🖨</span>PDF 저장</button>
+    </div><div class="rl">내보내기</div></div>
+    <div class="rg"><div class="rb">
+      <button id="bDemo" class="tall"><span class="ic">🎵</span>예제 열기</button>
+    </div><div class="rl">예제</div></div>
+  </div>
+
+  <div class="ribbon" data-panel="input">
+    <div class="rg"><div class="rb">
+      <button data-dur="1" title="온음표">𝅝<small>온</small></button>
+      <button data-dur="2" title="2분음표">𝅗𝅥<small>2분</small></button>
+      <button data-dur="4" title="4분음표">♩<small>4분</small></button>
+      <button data-dur="8" title="8분음표">♪<small>8분</small></button>
+      <button data-dur="16" title="16분음표">𝅘𝅥𝅯<small>16분</small></button>
+      <button data-dur="32" title="32분음표">𝅘𝅥𝅰<small>32분</small></button>
+      <button id="bDot" title="점음표 (.)">•<small>점음표</small></button>
+      <button id="bTrip" title="셋잇단 (T)">3<small>셋잇단</small></button>
+      <button id="bGrace" title="꾸밈음 (Q): 박자를 차지하지 않는 작은 음">♪ᵍ<small>꾸밈음</small></button>
+    </div><div class="rl">음표 길이 (+ / - 키)</div></div>
+    <div class="rg"><div class="rb">
+      <button data-rest="1" title="온쉼표 넣기">▬<small>온쉼표</small></button>
+      <button data-rest="2" title="2분쉼표 넣기">▃<small>2분</small></button>
+      <button data-rest="4" title="4분쉼표 넣기">𝄽<small>4분</small></button>
+      <button data-rest="8" title="8분쉼표 넣기">𝄾<small>8분</small></button>
+      <button data-rest="16" title="16분쉼표 넣기">𝄿<small>16분</small></button>
+    </div><div class="rl">쉼표 넣기 (R)</div></div>
+    <div class="rg"><div class="rb">
+      <button id="bInsBeat" title="커서 위치에 빈 칸 끼워넣기 (I 또는 Insert)">⇥<small>사이에 넣기</small></button>
+      <button id="bDelBeat" title="이 칸 통째로 삭제 (Shift+Delete)">⌫<small>칸 삭제</small></button>
+    </div><div class="rl">칸</div></div>
+    <div class="rg"><div class="rb">
+      <button id="bMeasure" title="여기서 마디 나누기 / 새 마디 (M)">┃<small>마디 나누기</small></button>
+      <button id="bAddMeasures" title="맨 뒤에 빈 마디 4개 추가">＋<small>마디 4개</small></button>
+      <button id="bBreak" title="이 마디부터 다음 줄에서 시작">↵<small>줄 바꾸기</small></button>
+    </div><div class="rl">마디</div></div>
+    <div class="rg"><div class="rb">
+      <button id="bPickD" title="다운 피킹 (D)">⊓<small>다운</small></button>
+      <button id="bPickU" title="업 피킹 (U)">V<small>업</small></button>
+    </div><div class="rl">피킹</div></div>
+    <div class="rg"><div class="rb col">
+      <label><input type="checkbox" id="autoNext" checked> 마디가 차면 다음 마디로</label>
+      <label><input type="checkbox" id="previewOn" checked> 입력할 때 소리</label>
+      <label><input type="checkbox" id="padOn"> 화면 숫자 패드 (터치용)</label>
+    </div><div class="rl">옵션</div></div>
+  </div>
+
+  <div class="ribbon" data-panel="tech">
+    <div class="rg"><div class="rb">
+      <button data-tech="bend:1">↗<small>벤딩 full</small></button>
+      <button data-tech="bend:0.5">↗<small>벤딩 ½</small></button>
+      <button data-tech="bend:1.5">↗<small>벤딩 1½</small></button>
+      <button data-tech="bend:r">↗↘<small>벤딩&릴리즈</small></button>
+    </div><div class="rl">벤딩 (B)</div></div>
+    <div class="rg"><div class="rb">
+      <button data-tech="link:slide">╱<small>슬라이드 (S)</small></button>
+      <button data-tech="link:hp">⌒<small>해머/풀 (H)</small></button>
+      <button data-tech="tog:tie">‿<small>붙임줄</small></button>
+      <button data-tech="slide:in">↗<small>슬라이드 인</small></button>
+      <button data-tech="slide:out">↘<small>슬라이드 아웃</small></button>
+    </div><div class="rl">연결</div></div>
+    <div class="rg"><div class="rb">
+      <button data-tech="tog:vib">〰<small>비브라토 V</small></button>
+      <button data-tech="tog:pm">P.M.<small>팜뮤트 P</small></button>
+      <button data-tech="tog:lr">🔔<small>렛링 L</small></button>
+      <button data-tech="tog:dead">x<small>데드 X</small></button>
+      <button data-tech="tog:ghost">( )<small>고스트 G</small></button>
+      <button data-tech="tog:harm">&lt;&gt;<small>하모닉</small></button>
+      <button data-tech="tog:acc">&gt;<small>악센트 A</small></button>
+    </div><div class="rl">주법 (숫자를 먼저 선택하세요)</div></div>
+  </div>
+
+  <div class="ribbon" data-panel="song">
+    <div class="rg"><div class="rb col">
+      <label>박자 <select id="ts0"><option>2</option><option>3</option><option selected>4</option><option>5</option><option>6</option><option>7</option><option>9</option><option>12</option></select>
+      / <select id="ts1"><option>2</option><option selected>4</option><option>8</option><option>16</option></select></label>
+      <label>BPM <input id="bpm" type="number" min="20" max="400" style="width:62px"></label>
+    </div><div class="rl">박자 · 빠르기</div></div>
+    <div class="rg"><div class="rb col">
+      <label>튜닝 <select id="tuning"></select></label>
+    </div><div class="rl">튜닝</div></div>
+    <div class="rg"><div class="rb col">
+      <label>한 줄에 <select id="perLine"><option value="0">자동</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select> 마디</label>
+    </div><div class="rl">악보 모양</div></div>
+  </div>
+
+  <div class="ribbon" data-panel="play">
+    <div class="rg"><div class="rb col">
+      <label>속도 <input id="speed" type="range" min="25" max="150" step="5" value="100"> <span id="speedVal">100%</span></label>
+      <label>톤 <select id="tone">
+        <option value="clean">클린</option>
+        <option value="distortion">디스토션</option>
+        <option disabled>오버드라이브 (준비 중)</option>
+        <option disabled>어쿠스틱 (준비 중)</option>
+      </select></label>
+    </div><div class="rl">소리</div></div>
+    <div class="rg"><div class="rb col">
+      <label><input type="checkbox" id="metroOn"> 메트로놈</label>
+      <label><input type="checkbox" id="countIn"> 시작 전 카운트</label>
+    </div><div class="rl">박자 맞추기</div></div>
+    <div class="rg"><div class="rb col">
+      <label><input type="checkbox" id="loopOn"> 구간 반복</label>
+      <label><input id="loopA" type="number" min="1" value="1" style="width:46px"> ~ <input id="loopB" type="number" min="1" value="2" style="width:46px"> 마디</label>
+    </div><div class="rl">반복 연습</div></div>
+    <div class="rg"><div class="rb col">
+      <label><input type="checkbox" id="follow" checked> 화면 따라가기</label>
+    </div><div class="rl">화면</div></div>
+  </div>
+
+  <div class="ribbon" data-panel="assist">
+    <div class="rg"><div class="rb">
+      <button id="vFingers" class="tall" title="앞뒤 음을 모두 고려해서 손가락 추천"><span class="ic">🖐</span>운지 추천</button>
+      <button id="bClearFingers" class="tall" title="직접 칠한 손가락 색 모두 지우기"><span class="ic">🧽</span>직접 칠한 색 지우기</button>
+    </div><div class="rl">손가락</div></div>
+    <div class="rg"><div class="rb">
+      <button id="vPicks" class="tall" title="⊓ 다운 / V 업 피킹 추천"><span class="ic">⊓V</span>피킹 추천</button>
+      <button id="bAutoRhythm" class="tall" title="박자가 안 맞는 마디의 음표 길이를 자동으로 맞춤"><span class="ic">✨</span>리듬 자동 맞춤</button>
+    </div><div class="rl">피킹 · 리듬</div></div>
+    <div class="rg"><div class="rb col">
+      <label><input type="checkbox" id="vFnums"> 손가락 번호 표시</label>
+      <label><input type="checkbox" id="vNames"> 음 이름 표시</label>
+    </div><div class="rl">표시</div></div>
+  </div>
+
+  <div class="ribbon" data-panel="help">
+    <div class="rg"><div class="rb">
+      <button id="bHelp" class="tall"><span class="ic">⌨</span>단축키 전체 보기</button>
+    </div><div class="rl">도움말 (F1)</div></div>
+    <div class="rg wide"><div class="rb col helptxt">
+      <div>① 줄 위를 클릭 → ② 숫자(프렛) 입력 → ③ <b>Enter</b> = 저장하고 다음 칸으로</div>
+      <div>숫자를 클릭하면 수정·삭제·손가락 색·주법 메뉴가 떠요. 숫자 <b>사이</b>에 마우스를 올리면 초록 선이 생기고, 누르면 새 칸이 끼워져요.</div>
+    </div><div class="rl">처음 쓰는 방법</div></div>
+  </div>
+</header>
+
+<main id="page">
+  <div id="songHead">
+    <input id="title" class="titlein" placeholder="제목">
+    <input id="artist" class="artistin" placeholder="아티스트">
+    <div id="printSub"></div>
+  </div>
+  <div id="legend"></div>
+  <div id="score"></div>
+</main>
+
+<div id="popup" class="popup hidden no-print"></div>
+
+<div id="helpModal" class="modal hidden no-print">
+  <div class="modalbox">
+    <button class="pclose" id="helpClose">✕</button>
+    <h2>⌨ 단축키 안내</h2>
+    <div class="helpgrid">
+      <div><h3>입력</h3>
+        <table>
+          <tr><td>클릭</td><td>줄 위치 선택</td></tr>
+          <tr><td>0~9 → Enter</td><td>프렛 숫자 저장 후 다음 칸</td></tr>
+          <tr><td>숫자 클릭</td><td>수정 / 삭제 / 손가락 색 / 주법</td></tr>
+          <tr><td>숫자 사이 클릭</td><td>새 칸 끼워넣기 (초록 선)</td></tr>
+          <tr><td>I 또는 Insert</td><td>커서 위치에 새 칸 끼워넣기</td></tr>
+          <tr><td>← → ↑ ↓</td><td>칸 / 줄 이동</td></tr>
+          <tr><td>Delete</td><td>숫자 지우기</td></tr>
+          <tr><td>Shift+Delete</td><td>칸 통째로 지우기</td></tr>
+          <tr><td>Esc</td><td>취소</td></tr>
+        </table>
+        <h3>마디</h3>
+        <table>
+          <tr><td>M</td><td>마디 나누기 / 새 마디</td></tr>
+          <tr><td>마디 번호 클릭</td><td>구간 이름, 박자 변경, 줄 바꾸기, 복사, 삭제</td></tr>
+        </table>
+      </div>
+      <div><h3>리듬</h3>
+        <table>
+          <tr><td>+ / -</td><td>음표 길게 / 짧게</td></tr>
+          <tr><td>.</td><td>점음표</td></tr>
+          <tr><td>T</td><td>셋잇단</td></tr>
+          <tr><td>Q</td><td>꾸밈음 (작은 숫자)</td></tr>
+          <tr><td>R</td><td>쉼표 넣기 (지금 선택된 길이)</td></tr>
+          <tr><td>D / U</td><td>피킹 ⊓ 다운 / V 업</td></tr>
+          <tr><td>줄 아래 클릭</td><td>음표 길이 메뉴</td></tr>
+        </table>
+        <h3>재생 · 기타</h3>
+        <table>
+          <tr><td>Space</td><td>재생 / 정지</td></tr>
+          <tr><td>Ctrl+Z / Ctrl+Y</td><td>되돌리기 / 다시 실행</td></tr>
+          <tr><td>Ctrl+S</td><td>저장</td></tr>
+          <tr><td>Ctrl+P</td><td>PDF 저장</td></tr>
+          <tr><td>F1</td><td>이 도움말</td></tr>
+        </table>
+      </div>
+      <div><h3>주법 (숫자 선택 후)</h3>
+        <table>
+          <tr><td>B</td><td>벤딩 (누를 때마다 full → ½ → 1½ → 릴리즈 → 없음)</td></tr>
+          <tr><td>S</td><td>슬라이드: S → 이어질 다음 숫자 클릭</td></tr>
+          <tr><td>H</td><td>해머온/풀오프: H → 다음 숫자 클릭</td></tr>
+          <tr><td>V</td><td>비브라토</td></tr>
+          <tr><td>P</td><td>팜뮤트 (P.M.)</td></tr>
+          <tr><td>L</td><td>렛링</td></tr>
+          <tr><td>X</td><td>데드노트 (x)</td></tr>
+          <tr><td>G</td><td>고스트노트 ( )</td></tr>
+          <tr><td>A</td><td>악센트 &gt;</td></tr>
+        </table>
+        <h3>손가락 색</h3>
+        <p><span class="sw" style="background:#1d6fe0"></span>검지 <span class="sw" style="background:#14a04a"></span>중지 <span class="sw" style="background:#e8730c"></span>약지 <span class="sw" style="background:#9b30e8"></span>새끼</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="pad" class="no-print hidden">
+  <div class="padrow" id="padNums"></div>
+  <div class="padrow">
+    <button data-pad="left">← 이전</button>
+    <button data-pad="up">↑ 위 줄</button>
+    <button data-pad="down">↓ 아래 줄</button>
+    <button data-pad="right">다음 →</button>
+    <button data-pad="x">x 데드</button>
+    <button data-pad="del">🗑 지우기</button>
+    <button data-pad="rest">쉼표</button>
+    <button data-pad="measure">┃ 마디</button>
+    <button data-pad="ins">⇥ 끼워넣기</button>
+    <button data-pad="hide" class="padhide">숨기기 ▾</button>
+  </div>
+</div>
+<footer id="statusbar" class="no-print">
+  <span id="minfo"></span> <span id="status"></span>
+  <span class="helphint">도움말: <b>F1</b></span>
+</footer>
+<input type="file" id="fileInput" accept=".json,.gtab" hidden>
+<input type="file" id="pdfInput" accept=".pdf,application/pdf" hidden>
+<div id="busy" class="modal hidden no-print"><div class="modalbox busybox"><div class="spin"></div><div id="busyText">PDF 읽는 중...</div></div></div>
+
+<script src="js/model.js"></script>
+<script src="js/fingering.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/render.js"></script>
+<script src="lib/pdf.min.js"></script>
+<script src="lib/pdf.worker.min.js"></script>
+<script src="js/pdfimport.js"></script>
+<script>
+  (function () { const s = document.getElementById('tuning'); for (const k in TUNINGS) { const o = document.createElement('option'); o.value = k; o.textContent = TUNINGS[k].name; s.appendChild(o); } })();
+</script>
+<script src="js/app.js"></script>
+</body>
+</html>

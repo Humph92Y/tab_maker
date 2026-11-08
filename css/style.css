@@ -1,0 +1,171 @@
+* { box-sizing: border-box; }
+body { margin: 0; font-family: "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif; background: #eef0f4; color: #1a1a1a; font-size: 13px; }
+#toolbar { position: sticky; top: 0; z-index: 20; background: #fff; border-bottom: 1px solid #d5d9e0; padding: 6px 10px; box-shadow: 0 2px 6px rgba(0,0,0,.05); }
+
+.logo { font-weight: 700; font-size: 15px; }
+.grp { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.glabel { color: #667; font-weight: 600; margin-right: 2px; }
+label { display: inline-flex; align-items: center; gap: 4px; color: #333; }
+input, select { font: inherit; padding: 3px 5px; border: 1px solid #c8ccd4; border-radius: 5px; background: #fff; }
+button { font: inherit; padding: 4px 9px; border: 1px solid #c8ccd4; border-radius: 6px; background: #f7f8fa; cursor: pointer; white-space: nowrap; }
+button:hover { background: #e9edf5; }
+button.on { background: #1d6fe0; color: #fff; border-color: #1d6fe0; }
+button.big { font-weight: 700; padding: 5px 16px; background: #14a04a; color: #fff; border-color: #14a04a; }
+button.big.on { background: #d63b3b; border-color: #d63b3b; }
+.assist button.on { background: #e8730c; border-color: #e8730c; }
+
+#page { max-width: 1400px; margin: 12px auto 90px; background: #fff; padding: 16px 18px 24px; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+#songHead h1 { margin: 0; font-size: 22px; text-align: center; }
+#printSub { text-align: center; color: #555; margin: 4px 0 6px; }
+#legend { display: flex; flex-wrap: wrap; gap: 4px 14px; justify-content: center; margin-bottom: 6px; min-height: 18px; }
+.lg { display: inline-flex; align-items: center; gap: 4px; }
+.lg i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; }
+.muted { color: #888; }
+
+svg.system { display: block; margin: 0 0 4px; user-select: none; overflow: visible; }
+.str { stroke: #9aa0aa; stroke-width: 1; }
+.bar { stroke: #555; stroke-width: 1.1; }
+.bar.thick { stroke-width: 3; }
+.sname { font-size: 10px; fill: #888; }
+.tabclef { font: 700 13px Georgia, serif; fill: #444; text-anchor: middle; }
+.tsig { font: 700 22px Georgia, serif; fill: #222; text-anchor: middle; }
+.mnum { font-size: 10px; fill: #999; cursor: pointer; }
+.mnum.over { fill: #d63b3b; font-weight: 700; }
+.mnum.under { fill: #e8730c; font-weight: 700; }
+.section { font: italic 700 12px Georgia, serif; fill: #333; }
+.fret { font: 700 13px Arial, sans-serif; text-anchor: middle; }
+.fret.grace { font-size: 10px; }
+.fret.sel { text-decoration: underline; }
+.fret.pend { fill: #1d6fe0; }
+.fnum { font: 700 8px Arial; text-anchor: end; }
+.nname { font: 8px Arial; fill: #888; }
+.nbg { fill: #fff; }
+.nbg.from { fill: #ffe7b3; stroke: #e8730c; stroke-width: 1.2; }
+.tech { font: 10px Arial; fill: #333; paint-order: stroke; stroke: #fff; stroke-width: 3px; }
+.tech.mid { text-anchor: middle; }
+.tech.small { font-size: 9px; }
+.dash { stroke: #555; stroke-dasharray: 3 2; }
+.slide { stroke: #333; stroke-width: 1.4; }
+.arc { fill: none; stroke: #333; stroke-width: 1; }
+.bend { fill: none; stroke: #333; stroke-width: 1.2; }
+.bend.dashed { stroke-dasharray: 3 2; }
+.arrow { fill: #333; }
+.vib { fill: none; stroke: #333; stroke-width: 1.2; }
+.stem { stroke: #222; stroke-width: 1.2; }
+.beam { stroke: #222; stroke-width: 3; }
+.flag { fill: none; stroke: #222; stroke-width: 1.5; }
+.dot, .rest { fill: #222; }
+.restl { fill: none; stroke: #222; stroke-width: 1.6; }
+.trip { font: italic 10px Georgia; text-anchor: middle; fill: #222; }
+.tbr { fill: none; stroke: #444; stroke-width: .8; }
+.pick { fill: none; stroke-width: 1.4; }
+.pick.fill { stroke: none; }
+.pick.auto { stroke: #2f6fd6; }
+.pick.auto.fill { fill: #2f6fd6; }
+.pick.man { stroke: #111; }
+.pick.man.fill { fill: #111; }
+.hit { fill: transparent; cursor: pointer; }
+.hit:hover { fill: rgba(29,111,224,.07); }
+.hit.ghost:hover { fill: rgba(20,160,74,.12); }
+.ghostplus { font: 14px Arial; fill: #c3c8d0; text-anchor: middle; }
+.colsel { fill: rgba(29,111,224,.06); }
+.cursor { fill: rgba(29,111,224,.15); stroke: #1d6fe0; stroke-width: 1.4; }
+.pendbg { fill: #fff; stroke: #1d6fe0; stroke-width: 1.6; }
+.playhead { fill: rgba(20,160,74,.18); stroke: #14a04a; stroke-width: 1.5; }
+
+.popup { position: absolute; z-index: 50; background: #fff; border: 1px solid #c8ccd4; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.18); padding: 10px 12px; max-width: 560px; }
+.popup.hidden { display: none; }
+.ph { font-size: 14px; margin-bottom: 6px; padding-right: 24px; }
+.prow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 5px 0; }
+.prow > label { width: 92px; color: #555; font-weight: 600; }
+.popup button { padding: 3px 8px; font-size: 12px; }
+.fbtn { border-left: 5px solid var(--fc) !important; }
+.fbtn.on { background: var(--fc) !important; color: #fff; border-color: var(--fc); }
+.pclose { position: absolute; top: 6px; right: 6px; border: none !important; background: none !important; font-size: 14px; }
+
+#statusbar { position: fixed; bottom: 0; left: 0; right: 0; background: #23262d; color: #e6e6e6; padding: 6px 12px; font-size: 12px; z-index: 30; }
+#status { color: #9fe3b0; }
+#status.warn, #minfo.warn { color: #ffb3a8; }
+#status.mode { color: #ffd27a; font-weight: 700; }
+#minfo { color: #bcd2ff; margin-right: 10px; }
+#keys { color: #aab; margin-top: 2px; line-height: 1.5; }
+#keys b { color: #fff; font-weight: 600; }
+
+@media print {
+  @page { size: A4; margin: 12mm; }
+  body { background: #fff; }
+  .no-print { display: none !important; }
+  #page { margin: 0; padding: 0; box-shadow: none; max-width: none; }
+  svg.system { break-inside: avoid; page-break-inside: avoid; width: 100%; height: auto; }
+  .fret, .pick, .lg i, rect { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+
+/* ===== 리본 메뉴 (워드 스타일) ===== */
+#toolbar { padding: 0; }
+.tabbar { display: flex; align-items: center; gap: 2px; padding: 4px 10px 0; background: #1f4e8c; }
+.tabbar .logo { color: #fff; margin-right: 14px; }
+.tab { background: transparent; border: none; color: #dfe8f7; border-radius: 6px 6px 0 0; padding: 7px 14px; font-weight: 600; }
+.tab:hover { background: rgba(255,255,255,.12); }
+.tab.on { background: #f6f7f9; color: #1f4e8c; }
+.spacer { flex: 1; }
+.qa { background: rgba(255,255,255,.15); color: #fff; border-color: rgba(255,255,255,.3); margin-bottom: 4px; }
+.qa:hover { background: rgba(255,255,255,.28); }
+.tabbar .big { margin: 0 0 4px 8px; }
+.ribbon { display: none; background: #f6f7f9; padding: 6px 10px 2px; min-height: 84px; align-items: stretch; flex-wrap: wrap; gap: 0; }
+.ribbon.on { display: flex; }
+.rg { display: flex; flex-direction: column; justify-content: space-between; padding: 0 10px; border-right: 1px solid #d9dde4; }
+.rg:last-child { border-right: none; }
+.rb { display: flex; align-items: center; gap: 3px; flex: 1; }
+.rb.col { flex-direction: column; align-items: flex-start; justify-content: center; gap: 6px; }
+.rl { text-align: center; color: #777; font-size: 11px; padding: 3px 0 2px; }
+.ribbon button { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; min-width: 46px; height: 54px; padding: 2px 6px; font-size: 18px; line-height: 1.1; background: transparent; border-color: transparent; }
+.ribbon button:hover { background: #e3e9f3; border-color: #c9d3e3; }
+.ribbon button.on { background: #cfe0fb; border-color: #8fb4ef; color: #0f3d80; }
+.ribbon button small { font-size: 11px; margin-top: 3px; color: #333; }
+.ribbon button.tall { font-size: 12px; min-width: 64px; }
+.ribbon button.tall .ic { font-size: 22px; margin-bottom: 3px; }
+.assist button.on { background: #ffe1c4 !important; border-color: #e8730c !important; color: #8a3c00; }
+.helptxt { font-size: 12.5px; color: #333; max-width: 640px; }
+
+/* 제목 입력 */
+#songHead { text-align: center; }
+.titlein { font-size: 24px; font-weight: 700; text-align: center; border: 1px dashed transparent; width: 70%; background: transparent; }
+.artistin { display: block; margin: 2px auto 0; font-size: 14px; text-align: center; border: 1px dashed transparent; width: 40%; color: #555; background: transparent; }
+.titlein:hover, .artistin:hover { border-color: #c8ccd4; }
+.titlein:focus, .artistin:focus { border-color: #1d6fe0; outline: none; background: #fff; }
+
+/* 사이에 끼워넣기 */
+.ins { fill: transparent; cursor: copy; }
+.ins:hover { fill: rgba(20,160,74,.45); }
+
+/* 도움말 창 */
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 100; display: flex; align-items: center; justify-content: center; }
+.modal.hidden { display: none; }
+.modalbox { position: relative; background: #fff; border-radius: 12px; padding: 18px 22px; max-width: 980px; width: 94%; max-height: 88vh; overflow: auto; }
+.modalbox h2 { margin: 0 0 8px; }
+.modalbox h3 { margin: 12px 0 4px; font-size: 14px; color: #1f4e8c; }
+.helpgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+.helpgrid table { border-collapse: collapse; width: 100%; }
+.helpgrid td { padding: 3px 6px; border-bottom: 1px solid #eee; vertical-align: top; }
+.helpgrid td:first-child { font-weight: 700; white-space: nowrap; color: #222; width: 1%; }
+.sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin: 0 3px 0 8px; vertical-align: -1px; }
+.helphint { float: right; color: #aab; }
+.helphint b { color: #fff; }
+@media print { .titlein, .artistin { border: none; } }
+.ribbon { flex-wrap: nowrap; overflow-x: auto; }
+.ribbon button { min-width: 40px; padding: 2px 4px; font-size: 17px; }
+.ribbon button small { font-size: 10.5px; }
+.rg { padding: 0 6px; flex-shrink: 0; }
+.rb.col label { white-space: nowrap; }
+.busybox { width: auto; display: flex; align-items: center; gap: 14px; font-size: 15px; }
+.spin { width: 26px; height: 26px; border: 3px solid #cfe0fb; border-top-color: #1d6fe0; border-radius: 50%; animation: sp 0.8s linear infinite; }
+@keyframes sp { to { transform: rotate(360deg); } }
+#pad { position: fixed; left: 0; right: 0; bottom: 28px; z-index: 35; background: #eef2f8; border-top: 1px solid #c9d3e3; padding: 6px 8px; box-shadow: 0 -3px 10px rgba(0,0,0,.08); }
+#pad.hidden { display: none; }
+.padrow { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin: 3px 0; }
+#pad button { min-width: 44px; height: 42px; font-size: 16px; font-weight: 600; background: #fff; border-color: #c3cad6; touch-action: manipulation; }
+#pad button[data-fret] { min-width: 40px; }
+#pad button:active { background: #cfe0fb; }
+.padhide { color: #666; }
+body.padopen #page { margin-bottom: 170px; }
+@media (pointer: coarse) { .hit, .ins { cursor: default; } .ins { fill: rgba(20,160,74,.08); } }

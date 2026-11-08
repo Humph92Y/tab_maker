@@ -1,0 +1,182 @@
+{
+ "version": 1,
+ "title": "꾸밈음 예시",
+ "artist": "",
+ "bpm": 90,
+ "ts": [
+  4,
+  4
+ ],
+ "tuning": "standard",
+ "tone": "clean",
+ "view": {
+  "fingers": true,
+  "picks": true,
+  "names": false,
+  "fingerNums": false
+ },
+ "measures": [
+  {
+   "id": "i1hgcfk",
+   "beats": [
+    {
+     "id": "i1i3knb",
+     "dur": 8,
+     "dot": false,
+     "trip": false,
+     "notes": [
+      {
+       "id": "i1jwpcn",
+       "s": 1,
+       "f": 9,
+       "hp": true,
+       "fa": 1
+      }
+     ],
+     "pick": null,
+     "grace": true,
+     "pa": "d"
+    },
+    {
+     "id": "i1k94kc",
+     "dur": 8,
+     "dot": true,
+     "trip": false,
+     "notes": [
+      {
+       "id": "i1lngek",
+       "s": 1,
+       "f": 11,
+       "fa": 3
+      }
+     ],
+     "pick": null,
+     "pa": null
+    },
+    {
+     "id": "i1mmti2",
+     "dur": 16,
+     "dot": false,
+     "trip": false,
+     "notes": [
+      {
+       "id": "i1nf9f4",
+       "s": 1,
+       "f": 9,
+       "fa": 1
+      }
+     ],
+     "pick": null,
+     "pa": "u"
+    },
+    {
+     "id": "i1o2osl",
+     "dur": 16,
+     "dot": false,
+     "trip": false,
+     "notes": [],
+     "pick": null,
+     "pa": null
+    },
+    {
+     "id": "i1pawr3",
+     "dur": 8,
+     "dot": true,
+     "trip": false,
+     "notes": [
+      {
+       "id": "i1qrxaf",
+       "s": 1,
+       "f": 11,
+       "bend": {
+        "a": 1
+       },
+       "fa": 3
+      }
+     ],
+     "pick": null,
+     "pa": "u"
+    },
+    {
+     "id": "i1r8919",
+     "dur": 8,
+     "dot": false,
+     "trip": false,
+     "notes": [
+      {
+       "id": "i1ssx0k",
+       "s": 1,
+       "f": 11,
+       "fa": 3
+      }
+     ],
+     "pick": null,
+     "pa": "d"
+    },
+    {
+     "id": "i1tknii",
+     "dur": 8,
+     "dot": false,
+     "trip": false,
+     "notes": [
+      {
+       "id": "i1u9p3q",
+       "s": 1,
+       "f": 11,
+       "bend": {
+        "a": 1
+       },
+       "fa": 3
+      }
+     ],
+     "pick": null,
+     "pa": "d"
+    },
+    {
+     "id": "i1vp8vb",
+     "dur": 8,
+     "dot": false,
+     "trip": false,
+     "notes": [
+      {
+       "id": "i1w43k9",
+       "s": 1,
+       "f": 11,
+       "bend": {
+        "a": 1,
+        "r": true
+       },
+       "fa": 3
+      }
+     ],
+     "pick": null,
+     "pa": "d"
+    },
+    {
+     "id": "i1xsjg2",
+     "dur": 8,
+     "dot": false,
+     "trip": false,
+     "notes": [
+      {
+       "id": "i1y41gf",
+       "s": 1,
+       "f": 9,
+       "fa": 1
+      }
+     ],
+     "pick": null,
+     "pa": "d"
+    }
+   ],
+   "ts": null,
+   "section": ""
+  },
+  {
+   "id": "i1zc1ds",
+   "beats": [],
+   "ts": null,
+   "section": ""
+  }
+ ]
+}
