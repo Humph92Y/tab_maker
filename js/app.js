@@ -52,8 +52,11 @@ function clampSel() {
 let lastMi = 0;
 function render() {
   if (lastMi !== sel.mi) { const prev = lastMi; lastMi = sel.mi; if (autoFitLeft(prev)) return; }
-  layout = renderScore(scoreEl, song, { sel, pending, mode: mode && { from: mode.from }, print: printMode, width: printMode ? 760 : scoreEl.clientWidth });
+  const z = printMode ? 1 : touchZoom();
+  layout = renderScore(scoreEl, song, { sel, pending, mode: mode && { from: mode.from }, print: printMode, width: printMode ? 760 : scoreEl.clientWidth / z });
+  if (z !== 1) scoreEl.querySelectorAll('svg.system').forEach(v => { v.style.width = (+v.getAttribute('width') * z) + 'px'; v.style.height = (+v.getAttribute('height') * z) + 'px'; });
   renderTeacher();
+  keepCursorVisible();
   updateDurButtons();
   updateLegend();
   updateMeasureInfo();
@@ -488,7 +491,8 @@ scoreEl.addEventListener('click', e => {
     const s = Math.max(0, Math.min(5, Math.round((sy - R.line0) / R.gap)));
     mutate(() => { song.measures[mi].beats.splice(bi, 0, newBeat(inputDur)); sel = { mi, bi, s }; });
     closePopup();
-    status(`${s + 1}번 줄에 새 칸을 끼워 넣었어요. 숫자를 입력하고 Enter`);
+    status(`${s + 1}번 줄에 새 칸을 끼워 넣었어요. 숫자를 입력하세요`);
+    if (wantKbd()) focusKbd();
     return;
   }
   if (el.dataset.col) {
@@ -500,7 +504,7 @@ scoreEl.addEventListener('click', e => {
     const n = curNote();
     render();
     if (n) { openPopup('note', anchor); previewAt(mi, sel.bi, s); }
-    else { closePopup(); status('숫자(프렛)를 입력하고 Enter를 누르세요'); }
+    else { closePopup(); if (wantKbd()) { focusKbd(); status('숫자를 누르면 바로 들어가요 (12처럼 두 자리는 이어서 누르세요)'); } else status(IS_TOUCH ? '아래 숫자 패드에서 프렛 숫자를 누르세요' : '숫자(프렛)를 입력하고 Enter를 누르세요'); }
   } else if (el.dataset.rhythm) {
     const [mi, bi] = el.dataset.rhythm.split(',').map(Number);
     sel.mi = mi; sel.bi = bi; pending = ''; render(); openPopup('rhythm', anchor);
@@ -700,20 +704,52 @@ $('bAutoRhythm').onclick = () => mutate(() => { let c = 0; song.measures.forEach
 $('bClearFingers').onclick = () => mutate(() => { song.measures.forEach(m => m.beats.forEach(b => b.notes.forEach(n => delete n.fm))); status('직접 칠한 손가락 색을 모두 지웠어요'); });
 
 // 파일
-function saveFile() {
-  const blob = new Blob([JSON.stringify(song, null, 1)], { type: 'application/json' });
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-  a.download = (song.title || '악보').replace(/[\\/:*?"<>|]/g, '_') + '.gtab.json';
+// 기본 저장 = MusicXML (다른 악보 프로그램에서도 열리는 공통 형식)
+function safeName() { return (song.title || '악보').replace(/[\\/:*?"<>|]/g, '_'); }
+function downloadBlob(blob, name) {
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
   document.body.appendChild(a); a.click(); a.remove();
-  status('악보 파일을 저장했어요 (다운로드 폴더를 확인하세요)');
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+const IS_TOUCH = matchMedia('(pointer: coarse)').matches;
+const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+function xmlBlob() { return new Blob([MusicXML.exportSong(song)], { type: 'application/vnd.recordare.musicxml+xml' }); }
+function saveFile() {
+  downloadBlob(xmlBlob(), safeName() + '.musicxml');
+  status(IS_IOS ? '저장했어요: "파일" 앱 → 다운로드 폴더에 있어요 (.musicxml)' : '저장했어요: 다운로드 폴더의 .musicxml 파일 (Guitar Pro, MuseScore에서도 열려요)');
+}
+function saveJson() {
+  downloadBlob(new Blob([JSON.stringify(song, null, 1)], { type: 'application/json' }), safeName() + '.gtab.json');
+  status('백업 파일(.gtab.json)을 저장했어요. 이 프로그램의 모든 정보(검사 표시 등)가 그대로 들어 있어요');
+}
+async function shareFile() {
+  const file = new File([MusicXML.exportSong(song)], safeName() + '.musicxml', { type: 'application/xml' });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: song.title }); status('보냈어요'); } catch (e) { if (e.name !== 'AbortError') saveFile(); }
+  } else saveFile();
 }
 $('bSave').onclick = saveFile;
+$('bSaveJson').onclick = saveJson;
+$('bShare').onclick = shareFile;
+if (!(navigator.share && navigator.canShare)) $('bShare').style.display = 'none';
 $('bOpen').onclick = () => $('fileInput').click();
-$('fileInput').onchange = e => {
-  const f = e.target.files[0]; if (!f) return;
-  const r = new FileReader();
-  r.onload = () => { try { const s = fixSong(JSON.parse(r.result)); snapshot(); song = s; sel = { mi: 0, bi: 0, s: 0 }; changed(true); status('악보를 불러왔어요'); } catch (err) { status('이 파일은 열 수 없어요', true); } };
-  r.readAsText(f); e.target.value = '';
+// iOS는 낯선 확장자(.musicxml)를 회색으로 막는 경우가 있어서 모든 파일을 고를 수 있게
+if (IS_IOS) $('fileInput').removeAttribute('accept');
+$('fileInput').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  if (/\.pdf$/i.test(f.name)) { status('PDF는 "PDF 악보 불러오기" 버튼으로 열어주세요', true); return; }
+  try {
+    const buf = await f.arrayBuffer();
+    const r = await MusicXML.importFile(f.name, buf);
+    const s = fixSong(r.json ? r.json : r);
+    snapshot(); song = s; sel = { mi: 0, bi: 0, s: 0 }; changed(true);
+    const chk = song.measures.filter(m => m.check).length;
+    status(`"${song.title}" 악보를 불러왔어요 (${song.measures.length}마디)` + (chk ? ` · ⚠ 박자가 안 맞는 마디 ${chk}개` : ''));
+  } catch (err) {
+    console.error(err);
+    const why = { NO_UNZIP: '이 브라우저는 압축된 .mxl 파일을 풀 수 없어요. 원래 프로그램에서 압축 안 된 .musicxml로 내보내 주세요.', UNKNOWN_FORMAT: '악보 파일 형식이 아니에요. (.musicxml, .xml, .mxl, .gtab.json을 열 수 있어요)' }[err && err.message];
+    alert(why || '이 파일은 열 수 없어요. (' + (err && err.message) + ')'); status('파일을 열지 못했어요', true);
+  }
 };
 $('bNew').onclick = () => { if (!confirm('새 악보를 만들까요? (지금 악보는 Ctrl+Z로 되돌릴 수 있어요)')) return; snapshot(); song = newSong(); sel = { mi: 0, bi: 0, s: 0 }; changed(true); };
 $('bDemo').onclick = () => { snapshot(); song = demoSong(); sel = { mi: 0, bi: 0, s: 0 }; changed(true); status('예제 악보를 불러왔어요. ▶ 재생을 눌러보세요'); };
@@ -726,13 +762,58 @@ $('bPdf').onclick = exportPdf;
 window.addEventListener('beforeprint', () => { printMode = true; render(); });
 window.addEventListener('afterprint', () => { printMode = false; render(); });
 
+// ---------- 터치 기기: 화면 확대 / 숫자 자판 ----------
+function touchZoom() {
+  if (!IS_TOUCH) return 1;
+  const w = window.innerWidth; return w < 700 ? 1.2 : w < 1100 ? 1.15 : 1.1;
+}
+// 터치 기기: 숫자 패드/자판에 가려지지 않게 선택한 줄을 화면 안으로
+function keepCursorVisible() {
+  if (!IS_TOUCH || !layout || !layout.msys) return;
+  const si = layout.msys[sel.mi]; const svg = si !== undefined && scoreEl.querySelector(`svg[data-si="${si}"]`); if (!svg) return;
+  const r = svg.getBoundingClientRect();
+  const pad = $('pad'); const bottom = pad.classList.contains('hidden') ? (window.visualViewport ? window.visualViewport.height : window.innerHeight) - 40 : pad.getBoundingClientRect().top - 6;
+  const top = $('toolbar').getBoundingClientRect().bottom + 4;
+  if (r.bottom > bottom) window.scrollBy(0, r.bottom - bottom);
+  else if (r.top < top) window.scrollBy(0, r.top - top);
+}
+function wantKbd() { return IS_TOUCH && $('pad').classList.contains('hidden'); }
+function focusKbd() { const k = $('kbd'); k.value = ''; try { k.focus({ preventScroll: true }); } catch (e) { k.focus(); } }
+let kbdTimer = null;
+function kbdCommit() { clearTimeout(kbdTimer); kbdTimer = null; if (!pending) return; commitPending(); pending = ''; moveRight(); afterFill(); render(); }
+$('kbd').addEventListener('input', () => {
+  const k = $('kbd'); const v = k.value.replace(/\D/g, ''); k.value = '';
+  for (const ch of v) {
+    pending = (pending + ch).slice(-2);
+    // 3~9로 시작하면 한 자리, 1·2로 시작하면 다음 숫자를 잠깐 기다림 (12, 24 등)
+    if (pending.length === 2 || +pending >= 3) kbdCommit();
+  }
+  clearTimeout(kbdTimer);
+  if (pending) { render(); kbdTimer = setTimeout(kbdCommit, 900); }
+});
+$('kbd').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); if (pending) kbdCommit(); else { moveRight(); render(); } }
+  else if (e.key === 'Backspace' && !$('kbd').value) { e.preventDefault(); if (pending) { pending = pending.slice(0, -1); render(); } else deleteNote(); }
+  else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+    e.preventDefault(); kbdCommit();
+    if (e.key === 'ArrowRight') moveRight(); else if (e.key === 'ArrowLeft') moveLeft(); else sel.s = Math.max(0, Math.min(5, sel.s + (e.key === 'ArrowUp' ? -1 : 1)));
+    render();
+  } else if (/^[a-zA-Z ]$/.test(e.key)) { // 아이패드 실물 키보드 단축키(M, S, H...)
+    $('kbd').blur(); document.dispatchEvent(new KeyboardEvent('keydown', { key: e.key, shiftKey: e.shiftKey }));
+    e.preventDefault();
+  }
+});
+$('kbd').addEventListener('blur', () => { if (pending) kbdCommit(); });
+$('fab').onclick = e => { e.stopPropagation(); setPad(true); };
+if (IS_TOUCH) document.body.classList.add('touch');
+
 // ---------- 화면 숫자 패드 (아이패드/터치용) ----------
 (function () {
   const nums = $('padNums'); let h = '';
   for (let f = 0; f <= 24; f++) h += `<button data-fret="${f}">${f}</button>`;
   nums.innerHTML = h;
 })();
-function setPad(on) { $('pad').classList.toggle('hidden', !on); $('padOn').checked = on; document.body.classList.toggle('padopen', on); try { localStorage.setItem('gtab-pad', on ? '1' : '0'); } catch (e) { } }
+function setPad(on) { $('pad').classList.toggle('hidden', !on); $('padOn').checked = on; $('fab').classList.toggle('hidden', on || !IS_TOUCH); if (on) $('kbd').blur(); document.body.classList.toggle('padopen', on); try { localStorage.setItem('gtab-pad', on ? '1' : '0'); } catch (e) { } }
 $('padOn').onchange = e => setPad(e.target.checked);
 $('pad').addEventListener('click', e => {
   e.stopPropagation();
@@ -749,6 +830,7 @@ $('pad').addEventListener('click', e => {
     case 'measure': splitMeasure(); return;
     case 'ins': insertBeat(); return;
     case 'hide': setPad(false); return;
+    case 'kbd': setPad(false); focusKbd(); status('숫자 자판으로 입력하세요. 줄 위를 누르면 자판이 다시 나와요'); return;
   }
   closePopup(); render();
 });
@@ -821,4 +903,6 @@ window.addEventListener('resize', () => { clearTimeout(window._rz); window._rz =
 song = loadAutosave() || demoSong();
 syncToolbar();
 changed();
-status('줄 위를 클릭하고 숫자 → Enter. 아래 단축키 안내를 참고하세요');
+status(IS_TOUCH ? '줄 위를 누르고 아래 숫자 패드로 프렛을 입력하세요' : '줄 위를 클릭하고 숫자 → Enter. 아래 단축키 안내를 참고하세요');
+// 홈 화면 앱(오프라인) 지원: 인터넷 주소(https)에서 열었을 때만
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => { });

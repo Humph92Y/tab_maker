@@ -208,3 +208,86 @@ body.padopen #page { margin-bottom: 170px; }
 .theory td:first-child { font-size: 17px; white-space: nowrap; }
 .tipline { background: #eef5ff; padding: 4px 8px; border-radius: 6px; }
 @media print { .teach { display: none; } }
+
+/* ===== 탭 줄: 탭 목록은 가로로 밀어서 보기, 재생 버튼은 항상 보이게 ===== */
+.tabs { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; flex: 0 1 auto; min-width: 0; }
+.tabs::-webkit-scrollbar { display: none; }
+.tab { flex-shrink: 0; }
+.tabbar { flex-wrap: nowrap; padding-top: max(4px, env(safe-area-inset-top)); padding-left: max(10px, env(safe-area-inset-left)); padding-right: max(10px, env(safe-area-inset-right)); }
+.tabbar .logo { white-space: nowrap; flex-shrink: 0; }
+.tabbar .qa, .tabbar .big { flex-shrink: 0; }
+
+/* 숨은 숫자 자판 입력칸 (터치 기기) */
+#kbd { position: fixed; left: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; border: 0; padding: 0; font-size: 16px; z-index: -1; }
+#fab { position: fixed; right: max(14px, env(safe-area-inset-right)); bottom: calc(44px + env(safe-area-inset-bottom)); z-index: 36; width: 54px; height: 54px; border-radius: 50%; font-size: 24px; background: #1f6feb; color: #fff; border: none; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+#fab.hidden { display: none; }
+#statusbar { padding-bottom: calc(6px + env(safe-area-inset-bottom)); }
+#pad { bottom: calc(28px + env(safe-area-inset-bottom)); }
+
+/* ===== 터치 기기 (아이패드·휴대폰) 공통 ===== */
+body.touch { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+body.touch input, body.touch select { font-size: 16px; } /* 아이폰이 입력칸을 자동 확대하지 않게 */
+body.touch .helphint { display: none; }
+body.touch .ribbon button { height: 58px; min-width: 50px; }
+body.touch .popup button { padding: 7px 11px; font-size: 14px; min-height: 36px; }
+body.touch .cand { padding: 5px 6px; }
+body.touch .teach .tbtns button { padding: 6px 10px; font-size: 13px; }
+body.touch #pad button { height: 46px; font-size: 18px; }
+body.touch.padopen #page { margin-bottom: 230px; }
+
+/* ===== 아이패드 세로 / 작은 노트북 ===== */
+@media (max-width: 1100px) {
+  .helpgrid { grid-template-columns: repeat(2, 1fr); }
+  .teach { margin-left: 10px; }
+}
+
+/* ===== 휴대폰 ===== */
+@media (max-width: 700px) {
+  body { font-size: 14px; }
+  .tabbar { padding-left: max(6px, env(safe-area-inset-left)); padding-right: max(6px, env(safe-area-inset-right)); gap: 0; }
+  .tabbar .logo { font-size: 0; margin-right: 4px; }
+  .tabbar .logo::first-letter { font-size: 20px; }
+  .tab { padding: 8px 10px; font-size: 14px; }
+  .tabbar .qa { display: none; }
+  .tabbar .big { padding: 6px 10px; margin-left: 4px; }
+  .ribbon { min-height: 0; padding: 4px 4px 2px; }
+  .rg { padding: 0 4px; }
+  .rl { font-size: 10px; }
+  .ribbon button { min-width: 44px; padding: 2px 3px; }
+  .ribbon button.tall { min-width: 56px; font-size: 11px; }
+  #page { margin: 0 0 90px; padding: 10px 6px 20px; border-radius: 0; box-shadow: none; }
+  .titlein { width: 100%; font-size: 20px; }
+  .artistin { width: 80%; }
+  #legend { font-size: 11.5px; }
+  .teach { margin: 2px 0 12px; padding: 8px 10px; font-size: 14px; }
+  .tchip { min-width: 40px; }
+  .helpgrid { grid-template-columns: 1fr; }
+  .modal { align-items: stretch; }
+  .modalbox { width: 100%; max-width: none; max-height: none; height: 100%; border-radius: 0; padding: calc(14px + env(safe-area-inset-top)) 14px calc(20px + env(safe-area-inset-bottom)); }
+  .busybox { height: auto; margin: auto; width: 86%; border-radius: 12px; }
+  /* 메뉴 팝업은 화면 아래에서 올라오는 시트로 */
+  .popup { position: fixed !important; left: 0 !important; right: 0; top: auto !important; bottom: 0; max-width: none; max-height: 70vh; overflow-y: auto; border-radius: 16px 16px 0 0; padding: 14px 12px calc(16px + env(safe-area-inset-bottom)); z-index: 60; box-shadow: 0 -6px 24px rgba(0,0,0,.25); }
+  .popup .prow { flex-wrap: wrap; }
+  .popup .prow label { width: 100%; }
+  .cand { flex-wrap: wrap; }
+  .cand .cl { min-width: 0; width: 100%; }
+  #statusbar { font-size: 11.5px; padding-left: 8px; padding-right: 8px; }
+  #status { display: block; margin-top: 2px; }
+  .ribbon .rl { display: none; }
+  body.touch .ribbon button { height: 46px; }
+  .ribbon button { font-size: 16px; }
+  body.touch.padopen #page { margin-bottom: 200px; }
+}
+
+/* 터치 기기 숫자 패드: 0~12 / 13~24 두 줄 + 기능 버튼 한 줄(옆으로 밀기) */
+body.touch #padNums { display: grid; grid-template-columns: repeat(13, 1fr); gap: 3px; max-width: 900px; margin: 0 auto 3px; }
+body.touch #pad button[data-fret] { min-width: 0; padding: 0; height: 42px; font-size: 16px; }
+body.touch #pad .padrow:not(#padNums) { flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start; scrollbar-width: none; max-width: 900px; margin: 0 auto; }
+body.touch #pad .padrow:not(#padNums)::-webkit-scrollbar { display: none; }
+body.touch #pad .padrow:not(#padNums) button { flex-shrink: 0; min-width: 0; padding: 0 12px; font-size: 15px; height: 42px; }
+body.touch #pad { padding: 4px 5px; }
+@media (max-width: 700px) {
+  .rb.col { flex-direction: row; flex-wrap: nowrap; align-items: center; gap: 10px; }
+  body.touch #pad button[data-fret] { height: 40px; font-size: 15px; }
+  body.touch #pad .padrow:not(#padNums) button { height: 40px; font-size: 14px; padding: 0 10px; }
+}

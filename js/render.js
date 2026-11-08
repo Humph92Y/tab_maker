@@ -18,7 +18,7 @@ function noteFinger(n, view) { if (n.fm) return n.fm; if (view.fingers && n.fa &
 
 function renderScore(el, song, st) {
   const print = !!st.print;
-  const maxW = Math.max(400, (st.width || el.clientWidth) - 4);
+  const maxW = Math.max(260, (st.width || el.clientWidth) - 4);
   const tuning = TUNINGS[song.tuning].midi;
   const view = song.view;
   // 1) 마디별 자연 폭 계산

@@ -2,7 +2,15 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f4e8c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="타브 메이커">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" href="icons/icon-192.png">
 <title>기타 타브 메이커</title>
 <link rel="stylesheet" href="css/style.css">
 </head>
@@ -10,6 +18,7 @@
 <header id="toolbar" class="no-print">
   <div class="tabbar">
     <span class="logo">🎸 타브 메이커</span>
+    <div class="tabs">
     <button class="tab" data-tab="file">파일</button>
     <button class="tab" data-tab="input">입력</button>
     <button class="tab" data-tab="tech">주법</button>
@@ -17,6 +26,7 @@
     <button class="tab" data-tab="play">재생</button>
     <button class="tab" data-tab="assist">도우미</button>
     <button class="tab" data-tab="help">도움말</button>
+    </div>
     <span class="spacer"></span>
     <button id="bUndo" class="qa" title="되돌리기 (Ctrl+Z)">↶</button>
     <button id="bRedo" class="qa" title="다시 실행 (Ctrl+Y)">↷</button>
@@ -27,7 +37,9 @@
     <div class="rg"><div class="rb">
       <button id="bNew" class="tall"><span class="ic">📄</span>새 악보</button>
       <button id="bOpen" class="tall"><span class="ic">📂</span>열기</button>
-      <button id="bSave" class="tall" title="Ctrl+S"><span class="ic">💾</span>저장</button>
+      <button id="bSave" class="tall" title="공통 악보 파일(.musicxml)로 저장 · Ctrl+S"><span class="ic">💾</span>저장</button>
+      <button id="bShare" class="tall" title="AirDrop, 카카오톡, 메일, 파일 앱 등으로 보내기"><span class="ic">📤</span>보내기</button>
+      <button id="bSaveJson" class="tall" title="이 프로그램 전용 백업 파일(.gtab.json)"><span class="ic">🗂</span>백업 저장</button>
     </div><div class="rl">파일</div></div>
     <div class="rg"><div class="rb">
       <button id="bImportPdf" class="tall" title="Guitar Pro / MuseScore 등으로 만든 PDF 악보를 자동 인식"><span class="ic">📥</span>PDF 악보 불러오기</button>
@@ -327,14 +339,17 @@
     <button data-pad="rest">쉼표</button>
     <button data-pad="measure">┃ 마디</button>
     <button data-pad="ins">⇥ 끼워넣기</button>
+    <button data-pad="kbd" title="아이폰/아이패드 숫자 자판으로 입력">⌨ 자판</button>
     <button data-pad="hide" class="padhide">숨기기 ▾</button>
   </div>
 </div>
+<input id="kbd" type="text" inputmode="numeric" pattern="[0-9]*" enterkeyhint="next" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="프렛 숫자 입력">
+<button id="fab" class="no-print hidden" title="숫자 패드 열기">🔢</button>
 <footer id="statusbar" class="no-print">
   <span id="minfo"></span> <span id="status"></span>
   <span class="helphint">도움말: <b>F1</b></span>
 </footer>
-<input type="file" id="fileInput" accept=".json,.gtab" hidden>
+<input type="file" id="fileInput" accept=".musicxml,.xml,.mxl,.json,.gtab,application/xml,text/xml,application/json,application/vnd.recordare.musicxml+xml,application/vnd.recordare.musicxml" hidden>
 <input type="file" id="pdfInput" accept=".pdf,application/pdf" hidden>
 <div id="busy" class="modal hidden no-print"><div class="modalbox busybox"><div class="spin"></div><div id="busyText">PDF 읽는 중...</div></div></div>
 
@@ -345,6 +360,7 @@
 <script src="lib/pdf.min.js"></script>
 <script src="lib/pdf.worker.min.js"></script>
 <script src="js/pdfimport.js"></script>
+<script src="js/musicxml.js"></script>
 <script>
   (function () { const s = document.getElementById('tuning'); for (const k in TUNINGS) { const o = document.createElement('option'); o.value = k; o.textContent = TUNINGS[k].name; s.appendChild(o); } })();
 </script>
