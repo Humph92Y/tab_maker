@@ -228,7 +228,7 @@ function changeDur(dir) {
 }
 function toggleBeat(prop) {
   const b = curBeat(); if (!b) return status('먼저 음(칸)을 선택하세요', true);
-  mutate(() => { b[prop] = !b[prop]; if (prop === 'dot' || prop === 'trip') b.dm = true; });
+  mutate(() => { b[prop] = prop === 'dot' && b.dot === 2 ? true : !b[prop]; if (prop === 'dot' || prop === 'trip') b.dm = true; });
 }
 function setPick(p) {
   const b = curBeat(); if (!b) return;
@@ -358,6 +358,7 @@ const BEAT_PATTERNS = [
   { p: [360, 120], n: '♪.♬', c: '하나—아' },
   { p: [120, 360], n: '♬♪.', c: '하나이—' },
   { p: [120, 240, 120], n: '♬♪♬', c: '하나이—아' },
+  { p: [60, 420], n: '32분+겹점8분', c: '(톡)하나——' },
   { p: [240, 60, 180], n: '♪+32분+점16분', c: '하나 —앤아' },
   { p: [-240, 60, 180], n: '𝄾+32분+점16분', c: '(쉼) —앤아' },
   { p: [180, 60, 240], n: '점16+32+♪', c: '하나— 앤' },
@@ -643,7 +644,7 @@ function buildPopup(type) {
     h += patHtml();
     h += `<div class="ph">음표 길이 (이 칸)</div><div class="prow">`;
     DUR_LIST.forEach(d => h += btn(durIcon(d) + ' ' + DUR_LABEL[d], 'dur:' + d, b.dur === d));
-    h += `</div><div class="prow">${btn('점음표 (.)', 'btog:dot', b.dot)}${btn('셋잇단 (T)', 'btog:trip', b.trip)}${btn('꾸밈음 (Q)', 'btog:grace', b.grace, '작은 숫자로, 박자를 차지하지 않고 바로 앞에서 짧게 치는 음')}${btn('이 칸을 쉼표로', 'rest', isRest(b))}</div>`;
+    h += `</div><div class="prow">${btn('점음표 (.)', 'btog:dot', b.dot === true)}${btn('겹점 (..)', 'ddot', b.dot === 2, '점 2개: 원래 길이의 1.75배')}${btn('셋잇단 (T)', 'btog:trip', b.trip)}${btn('꾸밈음 (Q)', 'btog:grace', b.grace, '작은 숫자로, 박자를 차지하지 않고 바로 앞에서 짧게 치는 음')}${btn('이 칸을 쉼표로', 'rest', isRest(b))}</div>`;
     h += `<div class="prow"><label>피킹</label>${btn('⊓ 다운 (D)', 'pick:d', b.pick === 'd')}${btn('V 업 (U)', 'pick:u', b.pick === 'u')}${btn('직접 입력 지우기', 'pick:none', !b.pick)}${b.pa ? `<span class="muted"> 추천: ${b.pa === 'd' ? '⊓' : 'V'}</span>` : ''}</div>`;
     h += candHtml();
     h += `<div class="prow">${btn('앞에 쉼표 칸 넣기 (I)', 'insbeat')}${btn('이 칸 삭제', 'delbeat')}${b.dm ? btn('🔓 길이 자동으로 맡기기', 'undm', false, '직접 정한 길이를 풀어서 자동 추천이 바꿀 수 있게') : ''}</div>`;
@@ -676,6 +677,7 @@ $('popup').addEventListener('click', e => {
     case 'link': if (n && ((arg === 'slide' && n.slide === 'to') || (arg === 'hp' && n.hp))) startLink(arg); else if (n) linkNext(arg, sel.mi, sel.bi, n); break;
     case 'linkprev': { const pv = prevOnString(song, sel.mi, sel.bi, n.s); if (pv && ((arg === 'slide' && pv.note.slide === 'to') || (arg === 'hp' && pv.note.hp))) { mutate(() => { if (arg === 'slide') delete pv.note.slide; else delete pv.note.hp; }); status('연결을 해제했어요'); } else linkPrev(arg, sel.mi, sel.bi, n); break; }
     case 'pat': applyBeatPattern(+arg); break;
+    case 'ddot': mutate(() => { beat.dot = beat.dot === 2 ? false : 2; beat.dm = true; }); break;
     case 'togcands': showCands = !showCands; reopenPopup(); break;
     case 'slide': toggleNote('slide', arg); break;
     case 'tog': toggleNote(arg); break;

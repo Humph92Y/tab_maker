@@ -11,7 +11,7 @@ const FINGER_COLORS = { 1: '#1d6fe0', 2: '#14a04a', 3: '#e8730c', 4: '#9b30e8', 
 const FINGER_NAMES = { 1: '검지', 2: '중지', 3: '약지', 4: '새끼', T: '엄지' };
 
 function esc(t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
-function beatWidth(b) { if (b.grace) return 24; const base = { 1: 66, 2: 54, 4: 44, 8: 36, 16: 31, 32: 28 }[b.dur]; const wide = b.notes.some(n => n.f >= 10 || n.harm || n.ghost || n.tie) ? 6 : 0; return (base + wide) * (b.dot ? 1.12 : 1); }
+function beatWidth(b) { if (b.grace) return 24; const base = { 1: 66, 2: 54, 4: 44, 8: 36, 16: 31, 32: 28 }[b.dur]; const wide = b.notes.some(n => n.f >= 10 || n.harm || n.ghost || n.tie) ? 6 : 0; return (base + wide) * (b.dot === 2 ? 1.2 : b.dot ? 1.12 : 1); }
 function bendLabel(a) { return a === 0.5 ? '½' : a === 1 ? 'full' : a === 1.5 ? '1½' : a === 2 ? '2' : a; }
 function noteLabel(n) { if (n.dead) return 'x'; if (n.harm) return '<' + n.f + '>'; if (n.ghost || n.tie) return '(' + n.f + ')'; return String(n.f); }
 function noteFinger(n, view) { if (n.fm) return n.fm; if (view.fingers && n.fa && n.f > 0) return n.fa; return null; }
@@ -233,13 +233,16 @@ function rhythm(info, ts) {
   info.forEach((it, i) => {
     const f = flagsOf(it.b.dur);
     const grp = Math.floor((it.onset + 0.001) / groupT);
-    if (!it.rest && f > 0 && g.length && g[g.length - 1].grp === grp && !g[g.length - 1].rest) { g.push({ ...it, f, grp }); }
+    if (f > 0 && g.length && g[g.length - 1].grp === grp && g[g.length - 1].f > 0) { g.push({ ...it, f, grp }); }
     else { if (g.length) groups.push(g); g = [{ ...it, f, grp }]; }
   });
   if (g.length) groups.push(g);
+  // 음이 하나도 없는 덩어리(쉼표만)는 따로따로 그림
+  for (let i = groups.length - 1; i >= 0; i--) if (groups[i].length > 1 && !groups[i].some(x => !x.rest)) groups.splice(i, 1, ...groups[i].map(x => [x]));
   groups.forEach(gr => {
-    if (gr.length >= 2 && gr.every(x => x.f > 0 && !x.rest)) {
-      gr.forEach(x => o += `<line x1="${x.cx}" x2="${x.cx}" y1="${T}" y2="${B}" class="stem"/>`);
+    // 같은 박 안의 쉼표도 빔으로 함께 묶음 (Guitar Pro 표기와 같게): 쉼표는 위에, 기둥은 쉼표 아래부터
+    if (gr.length >= 2 && gr.every(x => x.f > 0) && gr.some(x => !x.rest)) {
+      gr.forEach(x => { x.inBeam = true; if (x.rest) { o += restGlyph(x.cx, T + 10, x.b.dur); o += `<line x1="${x.cx}" x2="${x.cx}" y1="${T + 20}" y2="${B}" class="stem"/>`; } else o += `<line x1="${x.cx}" x2="${x.cx}" y1="${T}" y2="${B}" class="stem"/>`; });
       o += `<line x1="${gr[0].cx}" x2="${gr[gr.length - 1].cx}" y1="${B - 1.5}" y2="${B - 1.5}" class="beam"/>`;
       for (let L = 2; L <= 3; L++) {
         const y = B - 1.5 - (L - 1) * 5;
@@ -251,7 +254,7 @@ function rhythm(info, ts) {
         });
       }
     } else gr.forEach(x => o += single(x));
-    gr.forEach(x => { if (x.b.dot) o += `<circle cx="${x.cx + 5}" cy="${x.rest ? T + 14 : B - 6}" r="1.7" class="dot"/>`; });
+    gr.forEach(x => { if (x.b.dot) { const dy = x.rest && !x.inBeam ? T + 14 : B - 6; o += `<circle cx="${x.cx + 5}" cy="${dy}" r="1.7" class="dot"/>`; if (x.b.dot === 2) o += `<circle cx="${x.cx + 10}" cy="${dy}" r="1.7" class="dot"/>`; } });
   });
   // 셋잇단
   let run = [];

@@ -32,7 +32,7 @@ function newSong() {
   };
 }
 
-function beatTicks(b) { if (b.grace) return 0; let t = TICKS[b.dur]; if (b.dot) t *= 1.5; if (b.trip) t = t * 2 / 3; return t; }
+function beatTicks(b) { if (b.grace) return 0; let t = TICKS[b.dur]; if (b.dot === 2) t *= 1.75; else if (b.dot) t *= 1.5; if (b.trip) t = t * 2 / 3; return t; }
 function isRest(b) { return !b.notes || b.notes.length === 0; }
 function measureTs(song, mi) { for (let i = mi; i >= 0; i--) if (song.measures[i].ts) return song.measures[i].ts; return song.ts; }
 function measureCapacity(ts) { return ts[0] * 1920 / ts[1]; }
@@ -79,9 +79,9 @@ function isLegatoTarget(song, mi, bi, n) {
 // 2) 없으면 마디 길이에 맞게 균등 분배
 // ===== 리듬(음표 길이) 추천 =====
 // 길이(틱) → 음표 표기
-const TICK_TO_DUR = { 1920: [1, 0, 0], 1440: [2, 1, 0], 960: [2, 0, 0], 720: [4, 1, 0], 480: [4, 0, 0], 360: [8, 1, 0], 240: [8, 0, 0], 180: [16, 1, 0], 120: [16, 0, 0], 60: [32, 0, 0], 320: [4, 0, 1], 160: [8, 0, 1], 80: [16, 0, 1] };
+const TICK_TO_DUR = { 1680: [2, 2, 0], 840: [4, 2, 0], 420: [8, 2, 0], 210: [16, 2, 0], 1920: [1, 0, 0], 1440: [2, 1, 0], 960: [2, 0, 0], 720: [4, 1, 0], 480: [4, 0, 0], 360: [8, 1, 0], 240: [8, 0, 0], 180: [16, 1, 0], 120: [16, 0, 0], 60: [32, 0, 0], 320: [4, 0, 1], 160: [8, 0, 1], 80: [16, 0, 1] };
 const RHY_VALUES = [1920, 1440, 960, 720, 480, 360, 240, 180, 120];
-function setBeatTicks(b, t) { const v = TICK_TO_DUR[t]; if (!v) return false; b.dur = v[0]; b.dot = !!v[1]; b.trip = !!v[2]; return true; }
+function setBeatTicks(b, t) { const v = TICK_TO_DUR[t]; if (!v) return false; b.dur = v[0]; b.dot = v[1] === 2 ? 2 : !!v[1]; b.trip = !!v[2]; return true; }
 function rhythmSig(m) { return m.beats.map(b => b.grace ? 'g' : beatTicks(b) + (isRest(b) ? 'r' : '')).join(','); }
 
 // 박의 위치(정박/엇박)를 보고 "음악적으로 자연스러운" 길이 조합을 점수로 찾음.

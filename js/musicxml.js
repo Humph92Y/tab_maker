@@ -46,7 +46,7 @@ const MusicXML = (function () {
           if (!b.grace) c += `<duration>${dur}</duration>`;
           return c;
         };
-        const after = () => `<voice>1</voice><type>${TYPE[b.dur]}</type>${b.dot ? '<dot/>' : ''}${b.trip ? '<time-modification><actual-notes>3</actual-notes><normal-notes>2</normal-notes></time-modification>' : ''}`;
+        const after = () => `<voice>1</voice><type>${TYPE[b.dur]}</type>${b.dot ? (b.dot === 2 ? '<dot/><dot/>' : '<dot/>') : ''}${b.trip ? '<time-modification><actual-notes>3</actual-notes><normal-notes>2</normal-notes></time-modification>' : ''}`;
         if (isRest(b)) { o += `<note><rest/>${common()}${after()}</note>\n`; return; }
         const ns = b.notes.slice().sort((a, c) => c.s - a.s); // 낮은 줄부터
         ns.forEach((n, k) => {
@@ -146,7 +146,7 @@ const MusicXML = (function () {
             const dur = +txt(el, 'duration') || 0; const ticks = Math.round(dur * 480 / divisions);
             if (isGrace) { beat.grace = true; beat.dur = TYPE_R[type] || 8; }
             else if (!setBeatTicks(beat, ticks)) {
-              beat.dur = TYPE_R[type] || 8; beat.dot = dots > 0; beat.trip = !!tmod && txt(tmod, 'actual-notes') === '3';
+              beat.dur = TYPE_R[type] || 8; beat.dot = dots >= 2 ? 2 : dots > 0; beat.trip = !!tmod && txt(tmod, 'actual-notes') === '3';
             }
             beat.dm = true;
             m.beats.push(beat); lastBeat = beat;
