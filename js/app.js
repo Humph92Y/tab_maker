@@ -168,11 +168,35 @@ function startLink(type) {
     mutate(() => { if (type === 'slide') delete n.slide; else delete n.hp; });
     status(name + ' 연결을 해제했어요'); return;
   }
-  mode = { type, from: n || null, pos: n ? { ...sel } : null };
+  if (n) { linkNext(type, sel.mi, sel.bi, n); return; }
+  mode = { type, from: null, pos: null };
   closePopup();
   status(n ? `${name}: 이어질 다음 숫자를 클릭하세요 (Esc = 취소)` : `${name}: 시작할 숫자를 클릭하세요 (Esc = 취소)`);
   $('status').className = 'mode';
   render();
+}
+// 같은 줄의 "바로 다음" 숫자와 바로 연결 (클릭 안 해도 됨)
+function linkNext(type, mi, bi, n) {
+  const nx = nextOnString(song, mi, bi, n.s);
+  const name = type === 'slide' ? '슬라이드' : '해머온/풀오프';
+  if (!nx) { status(`${n.s + 1}번 줄에 이어질 다음 숫자가 없어요. ${name}는 같은 줄의 다음 숫자와 연결돼요`, true); return; }
+  if (type === 'hp' && nx.note.f === n.f) { status('같은 프렛끼리는 해머/풀이 안 돼요. 붙임줄(tie)을 써보세요', true); return; }
+  mutate(() => { if (type === 'slide') { n.slide = 'to'; delete n.hp; } else { n.hp = true; if (n.slide === 'to') delete n.slide; } });
+  const kind = type === 'slide' ? '슬라이드' : (nx.note.f > n.f ? '해머온' : '풀오프');
+  status(`✓ ${n.s + 1}번 줄 ${n.f} → ${nx.note.f} ${kind}로 연결했어요 (${nx.mi !== mi ? (nx.mi + 1) + '번째 마디의 ' : ''}같은 줄 다음 숫자)`);
+}
+// 같은 줄의 "바로 앞" 숫자에서 이 숫자로 연결
+function linkPrev(type, mi, bi, n) {
+  const pv = prevOnString(song, mi, bi, n.s);
+  if (!pv) { status(`${n.s + 1}번 줄에서 이 숫자 앞에 숫자가 없어요`, true); return; }
+  linkNext(type, pv.mi, pv.bi, pv.note);
+}
+function linkInfo(mi, bi, n) {
+  const nx = nextOnString(song, mi, bi, n.s), pv = prevOnString(song, mi, bi, n.s);
+  const parts = [];
+  if (pv && (pv.note.slide === 'to' || pv.note.hp)) parts.push(`← 앞 ${pv.note.f}에서 ${pv.note.slide === 'to' ? '슬라이드' : (n.f > pv.note.f ? '해머온' : '풀오프')}로 들어옴`);
+  if (nx && (n.slide === 'to' || n.hp)) parts.push(`→ 다음 ${nx.note.f}로 ${n.slide === 'to' ? '슬라이드' : (nx.note.f > n.f ? '해머온' : '풀오프')}`);
+  return { nx, pv, text: parts.join(' · ') };
 }
 function completeLink(mi, bi, s) {
   const target = noteAt(song.measures[mi].beats[bi], s);
@@ -251,11 +275,13 @@ function tickIcon(t, rest) {
   return `<span class="ri">${rest ? REST_ICON[v[0]] : durIcon(v[0])}${v[1] ? '.' : ''}${v[2] ? '<sup>3</sup>' : ''}</span>`;
 }
 function ticksIcons(m, ticks) { return m.beats.map((b, i) => b.grace ? '' : tickIcon(ticks[i], isRest(b))).join(''); }
+let showCands = false;
 function candHtml() {
   const m = song.measures[sel.mi]; popCands = rhythmCandidates(song, sel.mi);
   if (!popCands.length) return '';
+  if (!showCands) return `<div class="prow">${btn(`🎵 마디 전체 리듬 후보 보기 (${popCands.length}개) ▾`, 'togcands')}</div>`;
   const cur = m.beats.map(beatTicks).join(',');
-  let h = `<div class="ph2">🎵 리듬 후보 <span class="muted">— 숫자 개수에 맞춰 자연스러운 리듬을 골라 봤어요. ▶로 들어보고 마음에 들면 적용</span></div><div class="cands">`;
+  let h = `<div class="ph2">🎵 리듬 후보 ${btn('숨기기 ▴', 'togcands')} <span class="muted">— ▶로 들어보고 마음에 들면 적용</span></div><div class="cands">`;
   popCands.forEach((c, i) => {
     const on = c.ticks.join(',') === cur;
     h += `<div class="cand ${on ? 'on' : ''}"><span class="cl">${i + 1}. ${esc(c.label)}${on ? ' (지금)' : ''}</span><span class="cicons">${ticksIcons(m, c.ticks)}</span>${btn('▶', 'candplay:' + i, false, '이 리듬으로 들어보기')}${on ? '' : btn('적용', 'cand:' + i)}</div>`;
@@ -319,6 +345,54 @@ function playMeasure(sng, mi, loop) {
   $('bPlay').textContent = '■ 정지'; $('bPlay').classList.add('on');
   cancelAnimationFrame(rafId); tick();
   status(loop ? `🔁 ${mi + 1}번째 마디를 70% 속도로 반복해요 (Space = 정지)` : '▶ 미리 듣는 중');
+}
+
+// ---------- 한 박 리듬 패턴 ----------
+// 악보에서 빔(가로 막대)으로 묶인 덩어리 하나 = 보통 1박. 그 모양을 골라서 한 번에 적용.
+const BEAT_PATTERNS = [
+  { p: [480], n: '♩', c: '하나' },
+  { p: [240, 240], n: '♪♪', c: '하나 앤' },
+  { p: [240, 120, 120], n: '♪♬', c: '하나 앤아' },
+  { p: [120, 120, 240], n: '♬♪', c: '하나이 앤' },
+  { p: [120, 120, 120, 120], n: '♬♬', c: '하나이앤아' },
+  { p: [360, 120], n: '♪.♬', c: '하나—아' },
+  { p: [120, 360], n: '♬♪.', c: '하나이—' },
+  { p: [120, 240, 120], n: '♬♪♬', c: '하나이—아' },
+  { p: [-240, 240], n: '𝄾♪', c: '(쉼) 앤' },
+  { p: [-240, 120, 120], n: '𝄾♬', c: '(쉼) 앤아' },
+  { p: [240, -240], n: '♪𝄾', c: '하나 (쉼)' },
+  { p: [160, 160, 160], n: '♪♪♪³', c: '트리플' },
+];
+function patScaled(pt) {
+  const ts = measureTs(song, sel.mi); const k = (1920 / ts[1]) / 480;
+  const out = pt.p.map(v => Math.sign(v) * Math.abs(v) * k);
+  return out.every(v => TICK_TO_DUR[Math.abs(v)]) ? out : null;
+}
+function patIcon(arr) { return arr.map(v => tickIcon(Math.abs(v), v < 0)).join(''); }
+function patHtml() {
+  const ts = measureTs(song, sel.mi); const unitName = { 4: '4분음표', 8: '8분음표', 2: '2분음표', 16: '16분음표' }[ts[1]] || '1박';
+  let h = `<div class="pat"><div class="ph2">🥁 한 박 리듬 <span class="muted">— 악보에서 가로 막대로 묶인 한 덩어리(=${unitName} 1박)를 골라요. 이 칸부터 숫자 개수만큼 적용돼요</span></div><div class="patbtns">`;
+  BEAT_PATTERNS.forEach((pt, i) => { const sc = patScaled(pt); if (!sc) return; h += `<button data-act="pat:${i}" class="patb" title="${pt.c}"><span class="cicons">${patIcon(sc)}</span><small>${pt.c}</small></button>`; });
+  return h + `</div></div>`;
+}
+function applyBeatPattern(i) {
+  const sc = patScaled(BEAT_PATTERNS[i]); if (!sc) return;
+  if (pending) commitPending(); pending = '';
+  const m = song.measures[sel.mi];
+  mutate(() => {
+    let bi = Math.min(sel.bi, m.beats.length);
+    sc.forEach(v => {
+      let b = m.beats[bi];
+      while (b && b.grace) { bi++; b = m.beats[bi]; }
+      if (v < 0) { // 쉼표 자리: 지금 칸이 쉼표면 그대로, 아니면 쉼표 칸을 끼워 넣음
+        if (!b || !isRest(b)) { b = newBeat(8); m.beats.splice(bi, 0, b); }
+      } else if (!b) { b = newBeat(8); m.beats.push(b); }
+      setBeatTicks(b, Math.abs(v)); b.dm = true; bi++;
+    });
+    sel.bi = Math.min(bi, m.beats.length);
+  });
+  const fill = measureFill(m), cap = measureCapacity(measureTs(song, sel.mi));
+  status(`✓ 1박 적용: ${BEAT_PATTERNS[i].c}. ${fill === cap ? '이 마디가 꽉 찼어요 ✓' : fill < cap ? '다음 칸을 누르고 다음 박 모양을 고르세요' : '⚠ 마디가 넘쳐요. 마디 번호를 눌러 확인하세요'}`);
 }
 
 // ---------- 선생님 설명 ----------
@@ -524,7 +598,7 @@ document.addEventListener('click', e => {
 });
 
 // ---------- 팝업 메뉴 ----------
-function closePopup() { $('popup').classList.add('hidden'); popupInfo = null; }
+function closePopup() { $('popup').classList.add('hidden'); popupInfo = null; document.body.classList.remove('popopen'); }
 function reopenPopup() {
   if (!popupInfo) return;
   if (popupInfo.type === 'note' && !curNote()) return closePopup();
@@ -537,11 +611,9 @@ function openPopup(type, anchorEl) {
   buildPopup(type); placePopup();
 }
 function placePopup() {
-  const p = $('popup'); p.classList.remove('hidden');
-  let x = popupInfo.x, y = popupInfo.y + 6;
-  if (popupInfo.top !== undefined && y + p.offsetHeight > window.scrollY + window.innerHeight - 10) y = Math.max(window.scrollY + 5, popupInfo.top - p.offsetHeight - 6);
-  const w = p.offsetWidth; if (x + w > window.scrollX + window.innerWidth - 10) x = window.scrollX + window.innerWidth - w - 10;
-  p.style.left = Math.max(5, x) + 'px'; p.style.top = y + 'px';
+  const p = $('popup'); p.classList.remove('hidden'); document.body.classList.add('popopen');
+  p.style.left = ''; p.style.top = '';
+  setTimeout(keepCursorVisible, 0);
 }
 function btn(label, act, on, title) { return `<button data-act="${act}" class="${on ? 'on' : ''}" ${title ? `title="${title}"` : ''}>${label}</button>`; }
 
@@ -550,16 +622,22 @@ function buildPopup(type) {
   if (type === 'note') {
     const n = curNote(), midi = noteMidi(song, n);
     h += `<div class="ph">${n.s + 1}번 줄 · <b>${n.f}</b>프렛 <span class="muted">(${midiName(midi)})</span> ${btn('▶ 듣기', 'listen')}</div>`;
+    h += patHtml();
     h += `<div class="prow"><label>숫자 고치기</label><input id="pfret" type="number" min="0" max="24" value="${n.f}" style="width:60px"> ${btn('적용', 'setfret')} ${btn('🗑 삭제', 'del')}</div>`;
     h += `<div class="prow"><label>손가락 색</label>`;
     [1, 2, 3, 4, 'T'].forEach(f => h += `<button data-act="finger:${f}" class="fbtn ${n.fm == f ? 'on' : ''}" style="--fc:${FINGER_COLORS[f]}">${FINGER_NAMES[f]}${f === 'T' ? '' : ' ' + f}</button>`);
     h += btn('색 없음', 'finger:none', !n.fm) + (n.fa && !n.fm ? `<span class="muted"> 추천: ${FINGER_NAMES[n.fa]}</span>` : '') + `</div>`;
     h += `<div class="prow"><label>벤딩 (B)</label>${btn('없음', 'bend:none', !n.bend)}${btn('½', 'bend:0.5', n.bend && n.bend.a === 0.5 && !n.bend.r)}${btn('full', 'bend:1', n.bend && n.bend.a === 1 && !n.bend.r)}${btn('1½', 'bend:1.5', n.bend && n.bend.a === 1.5)}${btn('벤딩→릴리즈', 'bend:r', n.bend && n.bend.r)}</div>`;
-    h += `<div class="prow"><label>연결</label>${btn('슬라이드 → 다음 음 (S)', 'link:slide', n.slide === 'to')}${btn('해머/풀 → 다음 음 (H)', 'link:hp', n.hp)}${btn('붙임줄(tie)', 'tog:tie', n.tie, '앞 음과 이어서 길게')}</div>`;
+    const li = linkInfo(sel.mi, sel.bi, n);
+    const pvTxt = li.pv ? li.pv.note.f : '없음', nxTxt = li.nx ? li.nx.note.f : '없음';
+    h += `<div class="prow"><label>연결</label><span class="linkhint">같은 ${n.s + 1}번 줄: 앞 <b>${pvTxt}</b> · <b>${n.f}</b> · 다음 <b>${nxTxt}</b></span></div>`;
+    h += `<div class="prow"><label></label>${li.pv ? btn(`← ${pvTxt}에서 슬라이드`, 'linkprev:slide', li.pv.note.slide === 'to') + btn(`← ${pvTxt}에서 해머/풀`, 'linkprev:hp', li.pv.note.hp) : ''}${li.nx ? btn(`슬라이드 → ${nxTxt} (S)`, 'link:slide', n.slide === 'to') + btn(`해머/풀 → ${nxTxt} (H)`, 'link:hp', n.hp) : ''}${btn('붙임줄(tie)', 'tog:tie', n.tie, '앞 음과 이어서 길게')}</div>`;
+    if (li.text) h += `<div class="prow"><label></label><span class="muted">${li.text}</span></div>`;
     h += `<div class="prow"><label>슬라이드 인/아웃</label>${btn('↗ 아래에서 미끄러져 들어감', 'slide:in', n.slide === 'in')}${btn('↘ 미끄러져 나감', 'slide:out', n.slide === 'out')}</div>`;
     h += `<div class="prow"><label>주법</label>${btn('비브라토 (V)', 'tog:vib', n.vib)}${btn('팜뮤트 (P)', 'tog:pm', n.pm)}${btn('렛링 (L)', 'tog:lr', n.lr)}${btn('데드노트 x (X)', 'tog:dead', n.dead)}${btn('고스트 ( ) (G)', 'tog:ghost', n.ghost)}${btn('하모닉 < >', 'tog:harm', n.harm)}${btn('악센트 > (A)', 'tog:acc', n.acc)}${btn('꾸밈음 (Q)', 'btog:grace', curBeat().grace)}</div>`;
   } else if (type === 'rhythm') {
     const b = curBeat(); if (!b) return;
+    h += patHtml();
     h += `<div class="ph">음표 길이 (이 칸)</div><div class="prow">`;
     DUR_LIST.forEach(d => h += btn(durIcon(d) + ' ' + DUR_LABEL[d], 'dur:' + d, b.dur === d));
     h += `</div><div class="prow">${btn('점음표 (.)', 'btog:dot', b.dot)}${btn('셋잇단 (T)', 'btog:trip', b.trip)}${btn('꾸밈음 (Q)', 'btog:grace', b.grace, '작은 숫자로, 박자를 차지하지 않고 바로 앞에서 짧게 치는 음')}${btn('이 칸을 쉼표로', 'rest', isRest(b))}</div>`;
@@ -576,7 +654,7 @@ function buildPopup(type) {
     h += `<div class="prow">${btn('▶ 여기서부터 재생', 'playfrom')}${btn('🔁 이 마디 반복 연습', 'loopm')}</div>`;
     h += `<div class="prow">${btn('앞에 마디 추가', 'maddb')}${btn('뒤에 마디 추가', 'madda')}${btn('마디 복사해서 뒤에 붙이기', 'mcopy')}${btn('🗑 마디 삭제', 'mdel')}</div><div class="prow">${btn('↵ 이 마디부터 새 줄', 'mbrk', m.brk)}</div>`;
   }
-  p.innerHTML = h + `<button class="pclose" data-act="close">✕</button>`;
+  p.innerHTML = `<button class="pclose" data-act="close">✕</button>` + h;
 }
 function durIcon(d) { return { 1: '𝅝', 2: '𝅗𝅥', 4: '♩', 8: '♪', 16: '𝅘𝅥𝅯', 32: '𝅘𝅥𝅰' }[d]; }
 
@@ -592,7 +670,10 @@ $('popup').addEventListener('click', e => {
     case 'del': deleteNote(); break;
     case 'finger': mutate(() => { if (arg === 'none') delete n.fm; else n.fm = arg === 'T' ? 'T' : +arg; }); break;
     case 'bend': toggleNote('bend', arg === 'none' ? null : arg === 'r' ? { a: 1, r: true } : { a: +arg }); break;
-    case 'link': startLink(arg); break;
+    case 'link': if (n && ((arg === 'slide' && n.slide === 'to') || (arg === 'hp' && n.hp))) startLink(arg); else if (n) linkNext(arg, sel.mi, sel.bi, n); break;
+    case 'linkprev': { const pv = prevOnString(song, sel.mi, sel.bi, n.s); if (pv && ((arg === 'slide' && pv.note.slide === 'to') || (arg === 'hp' && pv.note.hp))) { mutate(() => { if (arg === 'slide') delete pv.note.slide; else delete pv.note.hp; }); status('연결을 해제했어요'); } else linkPrev(arg, sel.mi, sel.bi, n); break; }
+    case 'pat': applyBeatPattern(+arg); break;
+    case 'togcands': showCands = !showCands; reopenPopup(); break;
     case 'slide': toggleNote('slide', arg); break;
     case 'tog': toggleNote(arg); break;
     case 'dur': setDur(+arg); break;
@@ -794,12 +875,15 @@ function touchZoom() {
 }
 // 터치 기기: 숫자 패드/자판에 가려지지 않게 선택한 줄을 화면 안으로
 function keepCursorVisible() {
-  if (!IS_TOUCH || !layout || !layout.msys) return;
+  if (!layout || !layout.msys) return;
+  const popOpen = !$('popup').classList.contains('hidden');
+  if (!IS_TOUCH && !popOpen) return;
   const si = layout.msys[sel.mi]; const svg = si !== undefined && scoreEl.querySelector(`svg[data-si="${si}"]`); if (!svg) return;
   const r = svg.getBoundingClientRect();
-  const pad = $('pad'); const bottom = pad.classList.contains('hidden') ? (window.visualViewport ? window.visualViewport.height : window.innerHeight) - 40 : pad.getBoundingClientRect().top - 6;
+  const pad = $('pad'); let bottom = pad.classList.contains('hidden') ? (window.visualViewport ? window.visualViewport.height : window.innerHeight) - 40 : pad.getBoundingClientRect().top - 6;
+  if (popOpen) bottom = Math.min(bottom, $('popup').getBoundingClientRect().top - 6);
   const top = $('toolbar').getBoundingClientRect().bottom + 4;
-  if (r.bottom > bottom) window.scrollBy(0, r.bottom - bottom);
+  if (r.bottom > bottom) window.scrollBy(0, Math.min(r.bottom - bottom, r.top - top));
   else if (r.top < top) window.scrollBy(0, r.top - top);
 }
 function wantKbd() { return IS_TOUCH && $('pad').classList.contains('hidden'); }
