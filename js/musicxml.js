@@ -73,6 +73,7 @@ const MusicXML = (function () {
           if (k === 0 && b.pick === 'u') tech = `<up-bow/>` + tech;
           if (n.vib) orn += `<wavy-line type="start"/><wavy-line type="stop"/>`;
           if (n.acc) art += `<accent/>`;
+          if (n.stac) art += `<staccato/>`;
           nt += `<technical>${tech}</technical>`;
           if (orn) nt += `<ornaments>${orn}</ornaments>`;
           if (art) nt += `<articulations>${art}</articulations>`;
@@ -174,6 +175,7 @@ const MusicXML = (function () {
               if (kid(tech, 'palm-mute')) n.pm = true;
             }
             if (nots.getElementsByTagName('wavy-line').length || nots.getElementsByTagName('vibrato').length) n.vib = true;
+            if (nots.getElementsByTagName('staccato').length || nots.getElementsByTagName('staccatissimo').length) n.stac = true;
             if (nots.getElementsByTagName('accent').length || nots.getElementsByTagName('strong-accent').length) n.acc = true;
           }
           beat.notes.push(n); allNotes.push({ n, beat });

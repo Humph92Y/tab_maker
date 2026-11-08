@@ -248,6 +248,7 @@ const Player = (() => {
         }
         if (n.lr) { const nxs = nextOnString(song, curMi, curBi, n.s); endT = nxs && index.has(nxs.beat.id) ? t0 + tk(flat[index.get(nxs.beat.id)].onset - base) : endT + 2.5; }
         v.t1 = endT;
+        if (n.stac) v.t1 = st + Math.max(0.05, Math.min(endT - st, bd * 0.45)); // 스타카토: 짧게 끊기
         voice(v);
       });
     });

@@ -479,6 +479,7 @@ function teachStep(mi, bi, b, cb, w) {
     if (n.ghost) extra.push('아주 약하게, 거의 들릴 듯 말 듯 쳐요 (고스트노트).');
     if (n.harm) extra.push('프렛 바로 위(쇠 막대 위)에 손가락을 살짝 대기만 하고 쳐서 종소리 같은 소리를 내요 (하모닉).');
     if (n.acc) extra.push('다른 음보다 조금 세게 쳐요 (악센트).');
+    if (n.stac) extra.push('치자마자 왼손 힘을 살짝 풀거나 오른손을 줄에 대서 소리를 “딱” 짧게 끊어요 (스타카토).');
     if (n.lr) extra.push('손을 떼지 말고 소리가 계속 울리게 둬요 (렛링).');
   });
   return txt + (extra.length ? `<div class="tex">${[...new Set(extra)].join('<br>')}</div>` : '');
@@ -543,6 +544,7 @@ document.addEventListener('keydown', e => {
       case 'g': toggleNote('ghost'); break;
       case 'l': toggleNote('lr'); break;
       case 'a': toggleNote('acc'); break;
+      case 'c': toggleNote('stac'); break;
       case 't': toggleBeat('trip'); break;
       case 'q': toggleBeat('grace'); break;
       case 'r': insertRest(); break;
@@ -638,7 +640,7 @@ function buildPopup(type) {
     h += `<div class="prow"><label></label>${li.pv ? btn(`← ${pvTxt}에서 슬라이드`, 'linkprev:slide', li.pv.note.slide === 'to') + btn(`← ${pvTxt}에서 해머/풀`, 'linkprev:hp', li.pv.note.hp) : ''}${li.nx ? btn(`슬라이드 → ${nxTxt} (S)`, 'link:slide', n.slide === 'to') + btn(`해머/풀 → ${nxTxt} (H)`, 'link:hp', n.hp) : ''}${btn('붙임줄(tie)', 'tog:tie', n.tie, '앞 음과 이어서 길게')}</div>`;
     if (li.text) h += `<div class="prow"><label></label><span class="muted">${li.text}</span></div>`;
     h += `<div class="prow"><label>슬라이드 인/아웃</label>${btn('↗ 아래에서 미끄러져 들어감', 'slide:in', n.slide === 'in')}${btn('↘ 미끄러져 나감', 'slide:out', n.slide === 'out')}</div>`;
-    h += `<div class="prow"><label>주법</label>${btn('비브라토 (V)', 'tog:vib', n.vib)}${btn('팜뮤트 (P)', 'tog:pm', n.pm)}${btn('렛링 (L)', 'tog:lr', n.lr)}${btn('데드노트 x (X)', 'tog:dead', n.dead)}${btn('고스트 ( ) (G)', 'tog:ghost', n.ghost)}${btn('하모닉 < >', 'tog:harm', n.harm)}${btn('악센트 > (A)', 'tog:acc', n.acc)}${btn('꾸밈음 (Q)', 'btog:grace', curBeat().grace)}</div>`;
+    h += `<div class="prow"><label>주법</label>${btn('비브라토 (V)', 'tog:vib', n.vib)}${btn('팜뮤트 (P)', 'tog:pm', n.pm)}${btn('렛링 (L)', 'tog:lr', n.lr)}${btn('데드노트 x (X)', 'tog:dead', n.dead)}${btn('고스트 ( ) (G)', 'tog:ghost', n.ghost)}${btn('하모닉 < >', 'tog:harm', n.harm)}${btn('악센트 > (A)', 'tog:acc', n.acc)}${btn('스타카토 • (C)', 'tog:stac', n.stac, '짧게 끊어 치기')}${btn('꾸밈음 (Q)', 'btog:grace', curBeat().grace)}</div>`;
   } else if (type === 'rhythm') {
     const b = curBeat(); if (!b) return;
     h += patHtml();

@@ -318,3 +318,4 @@ body.popopen #page { margin-bottom: 48vh; }
 .calcgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 6px 22px; }
 .theory .calct td:first-child { font-size: 13px; }
 .calct tr.sum td { font-weight: 700; background: #eef7ee; }
+.stac { fill: #222; }

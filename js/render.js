@@ -146,6 +146,7 @@ function renderScore(el, song, st) {
           if (view.fingerNums && fg) o += `<text x="${cx - tw / 2 - 2}" y="${y - 3}" class="fnum" fill="${color}">${fg}</text>`;
           if (view.names && !n.dead) o += `<text x="${cx + tw / 2 + 1}" y="${y + 3}" class="nname">${midiName(tuning[n.s] + n.f, false)}</text>`;
           if (n.acc) o += `<text x="${cx}" y="${R.line0 - 13}" class="tech mid">&gt;</text>`;
+          if (n.stac) o += `<circle cx="${cx}" cy="${R.line0 - (n.acc ? 25 : 10)}" r="2" class="stac"/>`;
           if (n.vib) o += vibrato(cx + 4, R.line0 - 6, Math.max(16, w * 0.8));
           if (n.bend) o += bendGlyph(cx + tw / 2 - 1, y, n.bend);
           if (n.slide === 'in') o += `<line x1="${cx - tw / 2 - 12}" y1="${y + 5}" x2="${cx - tw / 2 - 2}" y2="${y - 1}" class="slide"/>`;
