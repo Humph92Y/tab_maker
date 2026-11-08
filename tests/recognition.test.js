@@ -52,3 +52,14 @@ for (const f of files) {
 test('요약', { skip: !files.length }, () => {
   console.log(`# 인식 정확도: 마디 ${total.exact}/${total.measures}, 음 ${total.eventsOk}/${total.events}, 쉼표 재현율 ${total.restTP}/${total.restT}, 쉼표 정밀도 ${total.restTP}/${total.restP}`);
 });
+
+// 해머/풀: 글자(H/P) 없이 타브 숫자 위에 그린 이음 곡선만 있는 악보 (Verovio, 글꼴 2종)
+for (const font of ['Leland', 'Bravura']) {
+  const f = path.join(__dirname, 'fixtures-tech', `slur-${font}.pdf`);
+  test('이음 곡선 = 해머/풀 (' + font + ')', { skip: !fs.existsSync(f) }, async () => {
+    const r = await ctx.P.importPdf(pdfjs, new Uint8Array(fs.readFileSync(f)));
+    const hp = r.song.measures.map(m => m.beats.map(b => b.notes.some(n => n.hp) ? 'h' : '-').join(''));
+    // 1마디: 5→7(해머) 7→5(풀) 그다음 2분음표, 2마디: 3, 5→7(해머), 8
+    assert.strictEqual(JSON.stringify(hp), JSON.stringify(['h-h--', '-h--']));
+  });
+}

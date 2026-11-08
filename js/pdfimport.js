@@ -618,6 +618,31 @@ const PdfImport = (() => {
       }));
       if (best) best.hp = true;
     });
+    // 해머/풀 ② 글자 없이 타브 숫자 위(또는 아래)에 그린 이음 곡선(슬러).
+    //  곡선 양 끝이 같은 줄의 두 숫자 위에 있고 프렛이 다르면 해머/풀 (같은 프렛이면 붙임줄이라 제외)
+    //  곡선이 숫자 여러 개에 걸치면 그 사이 음들도 모두 이어서 침 (예: 7 10 7 = 해머 + 풀)
+    const strY = k => tab.top - k * sp;
+    shapes.filter(c => c.kind === 'F' && c.curve && c.eh !== undefined && c.eh < sp * 0.35 && c.w > sp * 0.45 && c.w < sp * 12 && c.h < sp * 1.5 && c.h > 0.3 && c.cy > tab.bottom - sp * 1.2 && c.cy < tab.top + sp * 1.5).forEach(c => {
+      for (let k = 0; k < 6; k++) {
+        const y = strY(k);
+        // 곡선이 이 줄 바로 위(0~1.2칸) 또는 바로 아래에 있어야 함
+        if (!((c.y0 > y - sp * 0.1 && c.y0 < y + sp * 1.2) || (c.y1 < y + sp * 0.1 && c.y1 > y - sp * 1.2))) continue;
+        const row = all.filter(n => n.s === k && !n.beat.grace).sort((a, b) => a.x - b.x);
+        const a = row.filter(n => Math.abs(n.x - c.x0) < sp * 0.9).sort((p, q) => Math.abs(p.x - c.x0) - Math.abs(q.x - c.x0))[0];
+        const b = row.filter(n => Math.abs(n.x - c.x1) < sp * 0.9).sort((p, q) => Math.abs(p.x - c.x1) - Math.abs(q.x - c.x1))[0];
+        if (!a || !b || a === b) continue;
+        const seg = row.filter(n => n.x >= a.x && n.x <= b.x);
+        if (seg.every(n => n.f === a.f)) break; // 같은 프렛 = 붙임줄
+        // 곡선 위에 "sl." 이 있으면 해머/풀이 아니라 이어지는 슬라이드
+        const sl = texts.some(t => /^sl\.?$/i.test(t.str) && t.x + t.w / 2 > c.x0 - sp && t.x + t.w / 2 < c.x1 + sp && t.y > c.y0 - sp && t.y < tab.top + sp * 7);
+        for (let i = 0; i + 1 < seg.length; i++) {
+          if (seg[i + 1].f === seg[i].f || seg[i + 1].paren) continue;
+          if (sl || seg[i].slide) seg[i].slide = 'to'; else seg[i].hp = true;
+        }
+        if (DBG) DBG.push({ page: CUR_PAGE, x: c.cx, y: c.cy, method: sl ? 'slur-slide' : 'slur-hp', ok: true, notes: seg.map(n => n.f).join('-') });
+        break;
+      }
+    });
     // 벤딩
     const bendTxt = texts.filter(t => above(t) && /^(full|½|1\/2|1\/4|¼|1½|1 1\/2|2|3\/4)$/i.test(t.str) && t.y > tab.top);
     const bentCount = new Map();
