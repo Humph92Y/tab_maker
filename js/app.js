@@ -36,7 +36,8 @@ function changed(syncUi) {
   if (song.view.fingers) Fingering.suggest(song);
   if (song.view.picks) suggestPicking(song);
   autosave();
-  if (syncUi) syncToolbar();
+  teachCache = null;
+  if (syncUi) { syncToolbar(); lastMi = sel.mi; }
   render();
   if (popupInfo) reopenPopup();
 }
@@ -48,8 +49,11 @@ function clampSel() {
 }
 
 // ---------- 그리기 ----------
+let lastMi = 0;
 function render() {
+  if (lastMi !== sel.mi) { const prev = lastMi; lastMi = sel.mi; if (autoFitLeft(prev)) return; }
   layout = renderScore(scoreEl, song, { sel, pending, mode: mode && { from: mode.from }, print: printMode, width: printMode ? 760 : scoreEl.clientWidth });
+  renderTeacher();
   updateDurButtons();
   updateLegend();
   updateMeasureInfo();
@@ -70,8 +74,9 @@ function updateMeasureInfo() {
   const ts = measureTs(song, sel.mi), cap = measureCapacity(ts), fill = measureFill(m);
   const unit = 1920 / ts[1];
   const fmt = v => (Math.round(v / unit * 100) / 100);
-  $('minfo').textContent = `${sel.mi + 1}번째 마디 · ${fmt(fill)} / ${ts[0]}박 채움` + (fill > cap ? ' (넘침!)' : fill < cap && m.beats.length ? ' (모자람)' : fill === cap ? ' ✓' : '');
-  $('minfo').className = fill > cap ? 'warn' : '';
+  const prob = measureProblem(song, sel.mi);
+  $('minfo').textContent = `${sel.mi + 1}번째 마디 · ${fmt(fill)} / ${ts[0]}박 채움` + (fill > cap ? ' (넘침! 눌러서 해결)' : prob === 'under' ? ' (모자람 · 눌러서 해결)' : fill === cap ? ' ✓' : '');
+  $('minfo').className = prob ? 'warn' : '';
 }
 
 // ---------- 음 입력 ----------
@@ -186,7 +191,7 @@ function completeLink(mi, bi, s) {
 function setDur(d) {
   inputDur = d;
   const b = curBeat();
-  if (b) mutate(() => { b.dur = d; }); else render();
+  if (b) mutate(() => { b.dur = d; b.dm = true; }); else render();
 }
 function changeDur(dir) {
   const b = curBeat(); const i = DUR_LIST.indexOf(b ? b.dur : inputDur);
@@ -195,7 +200,7 @@ function changeDur(dir) {
 }
 function toggleBeat(prop) {
   const b = curBeat(); if (!b) return status('먼저 음(칸)을 선택하세요', true);
-  mutate(() => { b[prop] = !b[prop]; });
+  mutate(() => { b[prop] = !b[prop]; if (prop === 'dot' || prop === 'trip') b.dm = true; });
 }
 function setPick(p) {
   const b = curBeat(); if (!b) return;
@@ -206,7 +211,7 @@ function insertRest(dur) {
   if (pending) commitPending(); pending = '';
   const d = dur || inputDur;
   const m = song.measures[sel.mi];
-  mutate(() => { m.beats.splice(Math.min(sel.bi, m.beats.length), 0, newBeat(d)); sel.bi++; afterFill(); });
+  mutate(() => { const nb = newBeat(d); if (dur) nb.dm = true; m.beats.splice(Math.min(sel.bi, m.beats.length), 0, nb); sel.bi++; afterFill(); });
   status(`${DUR_LABEL[d].replace('음표', '쉼표')}를 넣었어요`);
 }
 function makeRest() { const b = curBeat(); if (!b) return insertRest(); mutate(() => { b.notes = []; }); status('이 칸을 쉼표로 바꿨어요'); }
@@ -219,6 +224,199 @@ function afterFill() {
   if (sel.mi === song.measures.length - 1) song.measures.push(newMeasure());
   sel.mi++; sel.bi = 0;
 }
+
+// ---------- 리듬 자동 맞춤 / 후보 ----------
+let teachCache = null;
+let popCands = [];
+function keepsManual(m, c) { return m.beats.every((b, i) => !b.dm || b.grace || c.ticks[i] === beatTicks(b)); }
+// 마디를 떠날 때 박자가 안 맞으면 (직접 정한 길이는 그대로 두고) 자동으로 맞춤
+function autoFitLeft(prev) {
+  const el = $('autoFit'); if (!el || !el.checked || Player.isPlaying()) return false;
+  const m = song.measures[prev]; if (!m || !m.beats.some(b => !b.grace)) return false;
+  if (measureFill(m) === measureCapacity(measureTs(song, prev))) return false;
+  if (m.beats.every(b => b.grace || b.dm)) return false;
+  const c = rhythmCandidates(song, prev).find(x => keepsManual(m, x));
+  if (!c) return false;
+  snapshot(); applyTicks(m, c.ticks); changed();
+  status(`✨ ${prev + 1}번째 마디의 음표 길이를 자동으로 맞췄어요. 마음에 안 들면 숫자 아래(리듬)를 눌러 다른 후보를 고르세요`);
+  return true;
+}
+const REST_ICON = { 1: '𝄻', 2: '𝄼', 4: '𝄽', 8: '𝄾', 16: '𝄿', 32: '𝅀' };
+function tickIcon(t, rest) {
+  const v = TICK_TO_DUR[t]; if (!v) return '?';
+  return `<span class="ri">${rest ? REST_ICON[v[0]] : durIcon(v[0])}${v[1] ? '.' : ''}${v[2] ? '<sup>3</sup>' : ''}</span>`;
+}
+function ticksIcons(m, ticks) { return m.beats.map((b, i) => b.grace ? '' : tickIcon(ticks[i], isRest(b))).join(''); }
+function candHtml() {
+  const m = song.measures[sel.mi]; popCands = rhythmCandidates(song, sel.mi);
+  if (!popCands.length) return '';
+  const cur = m.beats.map(beatTicks).join(',');
+  let h = `<div class="ph2">🎵 리듬 후보 <span class="muted">— 숫자 개수에 맞춰 자연스러운 리듬을 골라 봤어요. ▶로 들어보고 마음에 들면 적용</span></div><div class="cands">`;
+  popCands.forEach((c, i) => {
+    const on = c.ticks.join(',') === cur;
+    h += `<div class="cand ${on ? 'on' : ''}"><span class="cl">${i + 1}. ${esc(c.label)}${on ? ' (지금)' : ''}</span><span class="cicons">${ticksIcons(m, c.ticks)}</span>${btn('▶', 'candplay:' + i, false, '이 리듬으로 들어보기')}${on ? '' : btn('적용', 'cand:' + i)}</div>`;
+  });
+  return h + `</div>`;
+}
+// ⚠ 문제 진단 + 해결 버튼
+function diagHtml(mi) {
+  const prob = measureProblem(song, mi); if (!prob) return '';
+  const m = song.measures[mi], ts = measureTs(song, mi), cap = measureCapacity(ts), fill = measureFill(m);
+  const unit = 1920 / ts[1], bn = v => Math.round(v / unit * 100) / 100;
+  const unitName = { 2: '2분음표', 4: '4분음표', 8: '8분음표', 16: '16분음표' }[ts[1]] || '박';
+  let h = `<div class="diag ${prob}">`;
+  if (prob === 'over' || prob === 'under') {
+    popCands = rhythmCandidates(song, mi);
+    const best = popCands.find(c => keepsManual(m, c)) || popCands[0];
+    h += `<div class="dt">⚠ ${prob === 'over' ? '박자가 넘쳐요' : '박자가 모자라요'}</div>`;
+    h += `<div class="dx">이 마디는 <b>${ts[0]}/${ts[1]}박자</b>라서 ${unitName} <b>${ts[0]}개</b> 길이만큼 들어가요. 그런데 지금 음표 길이를 다 더하면 <b>${bn(fill)}개</b> 길이라서 <b>${bn(Math.abs(fill - cap))}개</b>만큼 ${prob === 'over' ? '넘쳐요' : '모자라요'}.</div>`;
+    h += `<div class="dx muted">${prob === 'over' ? '흔한 원인: 음표 길이(♪, ♩)가 실제보다 길게 들어갔거나, 다음 마디의 숫자가 이 마디에 같이 들어왔어요.' : '흔한 원인: 음표가 실제보다 짧게 들어갔거나, 쉼표가 빠졌어요. 노래 첫 마디(못갖춘마디)라면 원래 짧을 수도 있어요.'}</div>`;
+    h += `<div class="fixes">`;
+    if (best) h += `<div class="fix"><button data-act="fix:fit" class="primary">🔧 해결: 리듬 자동 맞춤</button> <span class="cicons">${ticksIcons(m, best.ticks)}</span> <span class="muted">(${esc(best.label)})</span></div>`;
+    if (prob === 'over') {
+      const k = overflowCount(mi);
+      if (k > 0 && k < m.beats.length) h += `<div class="fix"><button data-act="fix:move">🔧 해결: 넘치는 뒤쪽 ${k}칸을 다음 마디로 옮기기</button> <span class="muted">(지금 길이 그대로 두고 마디만 나눠요)</span></div>`;
+    } else {
+      h += `<div class="fix"><button data-act="fix:rest">🔧 해결: 마디 끝에 쉼표 넣기</button> <span class="muted">(${splitRestTicks(cap - fill).map(t => tickIcon(t, true)).join('')} 남은 길이만큼 쉬기)</span></div>`;
+      h += `<div class="fix"><button data-act="fix:ok">이대로 둘게요</button> <span class="muted">(첫 마디/마지막 마디처럼 원래 짧은 마디)</span></div>`;
+    }
+    h += `</div>`;
+    if (popCands.length > 1) h += `<div class="dx muted">다른 리듬을 원하면 아래 후보에서 골라도 돼요.</div>` + candHtml();
+  } else if (prob === 'check') {
+    h += `<div class="dt">🔍 PDF에서 자동으로 읽은 마디예요</div><div class="dx">박자 합은 맞췄지만, 일부 음표 길이는 추측했어요. ▶로 들어보고 원본과 비교한 뒤 괜찮으면 확인을 눌러 주세요.</div>`;
+    h += `<div class="fixes"><div class="fix"><button data-act="fix:checked" class="primary">✓ 확인 완료</button> ${btn('▶ 이 마디 듣기', 'loopm')}</div></div>` + candHtml();
+  }
+  return h + `</div>`;
+}
+function overflowCount(mi) {
+  const m = song.measures[mi], cap = measureCapacity(measureTs(song, mi));
+  let t = 0, i = 0; for (; i < m.beats.length; i++) { t += beatTicks(m.beats[i]); if (t > cap) break; }
+  return m.beats.length - i;
+}
+function doFix(kind) {
+  const mi = sel.mi, m = song.measures[mi], cap = measureCapacity(measureTs(song, mi));
+  if (kind === 'fit') {
+    const c = rhythmCandidates(song, mi); const best = c.find(x => keepsManual(m, x)) || c[0];
+    if (!best) return status('자동으로 맞출 수 있는 리듬을 찾지 못했어요. 음표 길이를 직접 골라 주세요', true);
+    mutate(() => { applyTicks(m, best.ticks); delete m.check; }); status('✓ 리듬을 맞췄어요. ▶로 들어보세요');
+  } else if (kind === 'move') {
+    const k = overflowCount(mi);
+    mutate(() => { const tail = m.beats.splice(m.beats.length - k, k); const nm = newMeasure(); nm.beats = tail; song.measures.splice(mi + 1, 0, nm); lastMi = sel.mi; });
+    status(`✓ 넘치던 ${k}칸을 새 마디로 옮겼어요`);
+  } else if (kind === 'rest') {
+    mutate(() => { splitRestTicks(cap - measureFill(m)).forEach(t => { const b = newBeat(8); setBeatTicks(b, t); b.dm = true; m.beats.push(b); }); });
+    status('✓ 마디 끝에 쉼표를 넣었어요');
+  } else if (kind === 'ok') { mutate(() => { m.okUnder = true; }); status('이 마디는 짧은 마디로 둘게요'); }
+  else if (kind === 'checked') { mutate(() => { delete m.check; }); status('확인 완료!'); }
+}
+function playMeasure(sng, mi, loop) {
+  if (Player.isPlaying()) Player.stop();
+  Player.play(sng, { from: mi, to: mi, speed: loop ? 0.7 : (+$('speed').value || 100) / 100, metronome: true, countIn: false, loop: !!loop }, onPlayStop);
+  $('bPlay').textContent = '■ 정지'; $('bPlay').classList.add('on');
+  cancelAnimationFrame(rafId); tick();
+  status(loop ? `🔁 ${mi + 1}번째 마디를 70% 속도로 반복해요 (Space = 정지)` : '▶ 미리 듣는 중');
+}
+
+// ---------- 선생님 설명 ----------
+const COUNT_WORDS = ['하나', '둘', '셋', '넷', '다섯', '여섯', '일곱', '여덟', '아홉', '열', '열하나', '열둘'];
+function countWord(t, unit) {
+  const n = Math.floor(t / unit), f = (t % unit) / unit;
+  if (f < 0.01) return COUNT_WORDS[n] || String(n + 1);
+  if (Math.abs(f - 0.5) < 0.01) return '앤';
+  if (Math.abs(f - 0.25) < 0.01) return '이';
+  if (Math.abs(f - 0.75) < 0.01) return '아';
+  if (Math.abs(f - 1 / 3) < 0.02) return '트';
+  if (Math.abs(f - 2 / 3) < 0.02) return '렛';
+  return '·';
+}
+const FN = { 1: '검지(1)', 2: '중지(2)', 3: '약지(3)', 4: '새끼(4)', T: '엄지(T)' };
+function teachData() {
+  if (teachCache) return teachCache;
+  const c = cloneSong(song); Fingering.suggest(c); suggestPicking(c);
+  return teachCache = c;
+}
+function teachHtml(mi) {
+  const m = song.measures[mi], ts = measureTs(song, mi), unit = 1920 / ts[1];
+  const unitName = { 2: '2분음표', 4: '4분음표', 8: '8분음표', 16: '16분음표' }[ts[1]] || '박';
+  let h = `<div class="th"><b>👩‍🏫 ${mi + 1}번째 마디, 이렇게 쳐 보세요</b><span class="tbtns"><button data-teach="loop">🔁 이 마디 70% 반복</button><button data-teach="stop">■ 정지</button><button data-teach="hide" title="선생님 설명 끄기 (도우미 탭에서 다시 켤 수 있어요)">✕</button></span></div>`;
+  if (!m.beats.length) return h + `<div class="tx">아직 음이 없어요. 줄 위를 클릭하고 숫자를 입력한 다음 Enter를 누르세요.</div>`;
+  const cm = teachData().measures[mi];
+  const words = []; for (let i = 0; i < ts[0]; i++) words.push(COUNT_WORDS[i] || i + 1);
+  h += `<div class="tx">⏱ <b>${ts[0]}/${ts[1]}박자</b>: 한 마디에 ${unitName} ${ts[0]}개 길이예요. 발로 박자를 맞추며 “${words.join(' - ')}” 하고 세요. 8분음표는 그 사이를 “앤”으로 (${words.slice(0, 2).map(w => w + ' 앤').join(' ')} …) 세면 돼요.</div>`;
+  // 박자 칩
+  let t = 0; const steps = [];
+  let chips = '<div class="tchips">';
+  m.beats.forEach((b, bi) => {
+    const cb = cm.beats[bi]; const w = b.grace ? '꾸밈' : countWord(t, unit);
+    const rest = isRest(b);
+    const label = rest ? '쉼' : b.notes.slice().sort((a, c) => a.s - c.s).map(n => `${n.s + 1}줄 ${n.dead ? 'x' : n.f}`).join('<br>');
+    chips += `<span class="tchip ${rest ? 'rest' : ''} ${bi === sel.bi && mi === sel.mi ? 'cur' : ''}"><i>${w}</i>${label}</span>`;
+    steps.push(teachStep(mi, bi, b, cb, w));
+    t += beatTicks(b);
+  });
+  chips += '</div>';
+  h += chips + `<ol class="tsteps">${steps.map(s => `<li>${s}</li>`).join('')}</ol>`;
+  // 손 위치 / 연습 팁
+  const fr = m.beats.flatMap(b => b.notes.filter(n => n.f > 0 && !n.dead).map(n => n.f));
+  const tips = [];
+  if (!fr.length) tips.push('모두 개방현(0)이라 왼손은 줄을 누르지 않아도 돼요. 오른손 리듬에만 집중하세요.');
+  else {
+    const lo = Math.min(...fr), hi = Math.max(...fr);
+    if (hi - lo <= 3) tips.push(`✋ 왼손 검지를 <b>${Math.max(1, lo)}프렛</b> 근처에 두면 손을 옮기지 않고 이 마디를 다 칠 수 있어요 (손가락 하나가 한 칸씩 맡아요).`);
+    else tips.push(`✋ 손 위치가 ${lo}프렛 ~ ${hi}프렛으로 넓게 움직여요. 옮겨 갈 자리를 미리 눈으로 봐 두고, 엄지는 넥 뒤에서 같이 미끄러지게 하세요.`);
+  }
+  const fast = m.beats.some(b => !b.grace && beatTicks(b) <= 120);
+  tips.push(`🐢 연습 순서: ① 박자를 소리 내어 세며 오른손만 쳐 보기 → ② 왼손을 더해 <b>70% 속도</b>로 반복 → ③ 익숙해지면 100%로.${fast ? ' 16분음표처럼 빠른 음이 있으니 피킹을 위·아래로 번갈아 치는 게 중요해요.' : ''}`);
+  h += `<div class="ttips">${tips.map(x => `<div>${x}</div>`).join('')}</div>`;
+  return h;
+}
+function teachStep(mi, bi, b, cb, w) {
+  const q = `<b>“${w}”</b>`;
+  if (b.grace) return `${q} 다음 음 바로 직전에 ${b.notes.map(n => `${n.s + 1}번 줄 ${n.f}프렛`).join(', ')}을 아주 짧게 “톡” 치고 바로 다음 음으로 넘어가요 (꾸밈음 — 박자를 차지하지 않아요).`;
+  if (isRest(b)) return `${q} 쉬어요 (쉼표). 오른손 손바닥이나 왼손 손가락을 줄에 살짝 대서 소리를 멈춰요.`;
+  if (b.notes.every(n => n.tie)) return `${q} 다시 치지 말고 앞 음을 누른 채로 소리를 계속 이어요 (붙임줄).`;
+  const pick = b.pick || cb.pa;
+  const legato = b.notes.every(n => isLegatoTarget(song, mi, bi, n));
+  const pickTxt = legato ? '오른손은 치지 않아요 (왼손만으로 소리를 내요)' : pick === 'd' ? '<b>⊓ 다운</b>(위에서 아래로) 쳐요' : pick === 'u' ? '<b>V 업</b>(아래에서 위로) 쳐요' : '쳐요';
+  const fin = (n, i) => { const cn = cb.notes.find(x => x.id === n.id) || {}; const f = n.fm || cn.fa; if (n.dead) return '살짝 대기만'; if (n.f === 0) return '누르지 않고(개방현)'; return f ? FN[f] + '로' : ''; };
+  const ns = b.notes.slice().sort((a, c) => a.s - c.s);
+  let txt;
+  if (ns.length === 1) { const n = ns[0]; txt = n.f === 0 && !n.dead ? `${q}에 <b>${n.s + 1}번 줄 개방현(0)</b>을 왼손으로 아무것도 누르지 않고 ${pickTxt}.` : n.dead ? `${q}에 <b>${n.s + 1}번 줄</b>을 왼손으로 살짝 대기만 하고 ${pickTxt}.` : `${q}에 <b>${n.s + 1}번 줄 ${n.f}프렛</b>을 ${fin(n)} 누르고 ${pickTxt}.`; }
+  else txt = `${q}에 줄 ${ns.length}개를 동시에 ${pickTxt}: ${ns.map(n => `${n.s + 1}번 줄 ${n.dead ? 'x' : n.f}${n.f > 0 && !n.dead ? '(' + (fin(n).replace('로', '')) + ')' : ''}`).join(', ')}. 피크로 줄을 한 번에 쓸듯이 쳐요 (화음).`;
+  const extra = [];
+  ns.forEach(n => {
+    const nx = nextOnString(song, mi, bi, n.s);
+    if (n.slide === 'to' && nx) extra.push(`${n.f}프렛을 친 뒤 손가락을 떼지 말고 줄 위로 <b>${nx.note.f}프렛까지 미끄러뜨려요</b> (슬라이드). 도착한 음은 다시 치지 않아요.`);
+    if (n.slide === 'in') extra.push('낮은 프렛에서 미끄러져 올라오며 소리를 내요 (슬라이드 인).');
+    if (n.slide === 'out') extra.push('친 다음 손가락을 누른 채 아래쪽으로 미끄러뜨리며 소리를 빼요 (슬라이드 아웃).');
+    if (n.hp && nx) extra.push(nx.note.f > n.f ? `다음 ${nx.note.f}프렛은 피킹하지 말고, 다른 손가락으로 줄을 <b>망치처럼 “탁” 세게 눌러</b> 소리를 내요 (해머온).` : `다음 ${nx.note.f}프렛은 피킹하지 말고, 누르던 손가락을 <b>줄을 살짝 튕기듯 떼어</b> 아래 음을 울려요 (풀오프). ${nx.note.f > 0 ? nx.note.f + '프렛은 미리 눌러 두세요.' : ''}`);
+    if (n.bend) extra.push(`친 다음 줄을 위로 밀어 올려 음을 <b>${n.bend.a === 0.5 ? '반음(1프렛 위 소리)' : n.bend.a === 1.5 ? '한 음 반(3프렛 위 소리)' : '한 음(2프렛 위 소리)'}</b>만큼 올려요. 약지로 밀고 검지·중지가 뒤에서 같이 밀어 줘요${n.bend.r ? '. 올린 뒤 천천히 원래 음으로 내려요 (릴리즈)' : ''}.`);
+    if (n.vib) extra.push('누른 채로 손가락을 위아래로 살살 흔들어 소리에 떨림을 줘요 (비브라토).');
+    if (n.pm) extra.push('오른손 손날을 브릿지 바로 앞 줄 위에 살짝 얹고 쳐서 “퉁퉁” 짧고 묵직한 소리를 내요 (팜뮤트).');
+    if (n.dead) extra.push('왼손은 줄을 누르지 말고 살짝 대기만 한 채 쳐서 “칙” 하는 소리를 내요 (데드노트).');
+    if (n.ghost) extra.push('아주 약하게, 거의 들릴 듯 말 듯 쳐요 (고스트노트).');
+    if (n.harm) extra.push('프렛 바로 위(쇠 막대 위)에 손가락을 살짝 대기만 하고 쳐서 종소리 같은 소리를 내요 (하모닉).');
+    if (n.acc) extra.push('다른 음보다 조금 세게 쳐요 (악센트).');
+    if (n.lr) extra.push('손을 떼지 말고 소리가 계속 울리게 둬요 (렛링).');
+  });
+  return txt + (extra.length ? `<div class="tex">${[...new Set(extra)].join('<br>')}</div>` : '');
+}
+function teachOn() { try { return localStorage.getItem('gtab-teach') !== '0'; } catch (e) { return true; } }
+function renderTeacher() {
+  if (printMode || !teachOn() || !layout || !layout.msys) return;
+  const si = layout.msys[sel.mi]; if (si === undefined) return;
+  const svg = scoreEl.querySelector(`svg[data-si="${si}"]`); if (!svg) return;
+  const d = document.createElement('div'); d.className = 'teach no-print'; d.innerHTML = teachHtml(sel.mi);
+  svg.after(d);
+}
+scoreEl.addEventListener('click', e => {
+  const b = e.target.closest('[data-teach]'); if (!b) return;
+  e.stopPropagation();
+  const a = b.dataset.teach;
+  if (a === 'loop') playMeasure(song, sel.mi, true);
+  else if (a === 'stop') Player.stop();
+  else if (a === 'hide') { try { localStorage.setItem('gtab-teach', '0'); } catch (er) { } $('vTeach').checked = false; render(); status('선생님 설명을 껐어요. 도우미 탭에서 다시 켤 수 있어요'); }
+}, true);
 
 // ---------- 키보드 ----------
 document.addEventListener('keydown', e => {
@@ -237,7 +435,7 @@ document.addEventListener('keydown', e => {
     case 'Insert': insertBeat(); break;
     case 'F1': openHelp(); break;
     case '?': openHelp(); break;
-    case 'Escape': $('helpModal').classList.add('hidden'); pending = ''; if (mode) { mode = null; status('취소했어요'); } closePopup(); render(); break;
+    case 'Escape': $('helpModal').classList.add('hidden'); $('theoryModal').classList.add('hidden'); pending = ''; if (mode) { mode = null; status('취소했어요'); } closePopup(); render(); break;
     case 'Backspace': if (pending) { pending = pending.slice(0, -1); render(); } else if (e.shiftKey) deleteBeat(); else deleteNote(); break;
     case 'Delete': if (e.shiftKey) deleteBeat(); else deleteNote(); break;
     case 'ArrowRight': if (pending) commitPending(); pending = ''; moveRight(); closePopup(); render(); break;
@@ -330,12 +528,13 @@ function reopenPopup() {
 }
 function openPopup(type, anchorEl) {
   const r = anchorEl.getBoundingClientRect();
-  popupInfo = { type, x: r.left + window.scrollX, y: r.bottom + window.scrollY };
+  popupInfo = { type, x: r.left + window.scrollX, y: r.bottom + window.scrollY, top: r.top + window.scrollY };
   buildPopup(type); placePopup();
 }
 function placePopup() {
   const p = $('popup'); p.classList.remove('hidden');
   let x = popupInfo.x, y = popupInfo.y + 6;
+  if (popupInfo.top !== undefined && y + p.offsetHeight > window.scrollY + window.innerHeight - 10) y = Math.max(window.scrollY + 5, popupInfo.top - p.offsetHeight - 6);
   const w = p.offsetWidth; if (x + w > window.scrollX + window.innerWidth - 10) x = window.scrollX + window.innerWidth - w - 10;
   p.style.left = Math.max(5, x) + 'px'; p.style.top = y + 'px';
 }
@@ -360,14 +559,16 @@ function buildPopup(type) {
     DUR_LIST.forEach(d => h += btn(durIcon(d) + ' ' + DUR_LABEL[d], 'dur:' + d, b.dur === d));
     h += `</div><div class="prow">${btn('점음표 (.)', 'btog:dot', b.dot)}${btn('셋잇단 (T)', 'btog:trip', b.trip)}${btn('꾸밈음 (Q)', 'btog:grace', b.grace, '작은 숫자로, 박자를 차지하지 않고 바로 앞에서 짧게 치는 음')}${btn('이 칸을 쉼표로', 'rest', isRest(b))}</div>`;
     h += `<div class="prow"><label>피킹</label>${btn('⊓ 다운 (D)', 'pick:d', b.pick === 'd')}${btn('V 업 (U)', 'pick:u', b.pick === 'u')}${btn('직접 입력 지우기', 'pick:none', !b.pick)}${b.pa ? `<span class="muted"> 추천: ${b.pa === 'd' ? '⊓' : 'V'}</span>` : ''}</div>`;
-    h += `<div class="prow">${btn('✨ 이 마디 리듬 자동 추천', 'autorhythm')}${btn('앞에 쉼표 칸 넣기 (I)', 'insbeat')}${btn('이 칸 삭제', 'delbeat')}</div>`;
+    h += candHtml();
+    h += `<div class="prow">${btn('앞에 쉼표 칸 넣기 (I)', 'insbeat')}${btn('이 칸 삭제', 'delbeat')}${b.dm ? btn('🔓 길이 자동으로 맡기기', 'undm', false, '직접 정한 길이를 풀어서 자동 추천이 바꿀 수 있게') : ''}</div>`;
   } else if (type === 'measure') {
     const m = song.measures[sel.mi]; const ts = m.ts || song.ts;
     h += `<div class="ph">${sel.mi + 1}번째 마디</div>`;
+    h += diagHtml(sel.mi);
     h += `<div class="prow"><label>구간 이름</label><input id="psec" value="${esc(m.section || '')}" placeholder="예: Intro, Verse, 솔로" style="width:150px"> ${btn('적용', 'setsec')}</div>`;
     h += `<div class="prow"><label>이 마디부터 박자</label><select id="pts0">${[1, 2, 3, 4, 5, 6, 7, 9, 12].map(v => `<option ${v === ts[0] ? 'selected' : ''}>${v}</option>`).join('')}</select> / <select id="pts1">${[2, 4, 8, 16].map(v => `<option ${v === ts[1] ? 'selected' : ''}>${v}</option>`).join('')}</select> ${btn('적용', 'setts')} ${m.ts ? btn('기본 박자로', 'clearts') : ''}</div>`;
-    if (m.check) h += `<div class="prow"><span class="muted">⚠ PDF에서 자동 인식한 마디예요. 원본과 비교해 보세요.</span> ${btn('✓ 확인 완료', 'mchecked')}</div>`;
-    h += `<div class="prow">${btn('▶ 여기서부터 재생', 'playfrom')}${btn('✨ 리듬 자동 추천', 'autorhythm')}</div>`;
+    if (!measureProblem(song, sel.mi)) h += candHtml();
+    h += `<div class="prow">${btn('▶ 여기서부터 재생', 'playfrom')}${btn('🔁 이 마디 반복 연습', 'loopm')}</div>`;
     h += `<div class="prow">${btn('앞에 마디 추가', 'maddb')}${btn('뒤에 마디 추가', 'madda')}${btn('마디 복사해서 뒤에 붙이기', 'mcopy')}${btn('🗑 마디 삭제', 'mdel')}</div><div class="prow">${btn('↵ 이 마디부터 새 줄', 'mbrk', m.brk)}</div>`;
   }
   p.innerHTML = h + `<button class="pclose" data-act="close">✕</button>`;
@@ -393,6 +594,11 @@ $('popup').addEventListener('click', e => {
     case 'btog': toggleBeat(arg); break;
     case 'rest': makeRest(); break;
     case 'pick': mutate(() => { beat.pick = arg === 'none' ? null : arg; }); break;
+    case 'cand': { const c = popCands[+arg]; if (!c) break; mutate(() => { applyTicks(m, c.ticks); }); status(`리듬을 바꿨어요: ${c.label}. ▶ 재생으로 들어보세요`); break; }
+    case 'candplay': { const c = popCands[+arg]; if (!c) break; const tmp = cloneSong(song); applyTicks(tmp.measures[sel.mi], c.ticks); playMeasure(tmp, sel.mi, false); break; }
+    case 'undm': mutate(() => { delete beat.dm; }); status('이 칸의 길이를 자동 추천에 맡겼어요'); break;
+    case 'fix': doFix(arg); break;
+    case 'loopm': closePopup(); playMeasure(song, sel.mi, true); break;
     case 'autorhythm': mutate(() => { const r = suggestRhythm(song, sel.mi); status(r === 'copy' ? '음 개수가 같은 다른 마디의 리듬을 그대로 가져왔어요' : r ? '마디 길이에 맞게 리듬을 나눴어요. 필요하면 직접 고쳐주세요' : '이 마디에 음이 없어요'); }); break;
     case 'insbeat': insertBeat(); break;
     case 'delbeat': deleteBeat(); break;
@@ -477,13 +683,20 @@ $('bHelp').onclick = openHelp;
 $('helpClose').onclick = () => $('helpModal').classList.add('hidden');
 $('helpModal').onclick = e => { if (e.target.id === 'helpModal') $('helpModal').classList.add('hidden'); };
 $('bGrace').onclick = () => toggleBeat('grace');
+$('minfo').onclick = e => { e.stopPropagation(); openPopup('measure', $('minfo')); };
+$('vTeach').checked = teachOn();
+$('vTeach').onchange = e => { try { localStorage.setItem('gtab-teach', e.target.checked ? '1' : '0'); } catch (er) { } render(); };
+function openTheory() { $('helpModal').classList.add('hidden'); $('theoryModal').classList.remove('hidden'); }
+$('bTheory').onclick = openTheory; $('bTheory2').onclick = openTheory;
+$('theoryClose').onclick = () => $('theoryModal').classList.add('hidden');
+$('theoryModal').onclick = e => { if (e.target.id === 'theoryModal') $('theoryModal').classList.add('hidden'); };
 $('bMeasure').onclick = () => { if (pending) commitPending(); pending = ''; splitMeasure(); };
 $('bUndo').onclick = undo; $('bRedo').onclick = redo;
 $('vFingers').onclick = () => mutate(() => { song.view.fingers = !song.view.fingers; if (!song.view.fingers) song.measures.forEach(m => m.beats.forEach(b => b.notes.forEach(n => delete n.fa))); syncToolbar(); status(song.view.fingers ? '앞뒤 음을 모두 보고 가장 편한 손가락을 색으로 표시했어요. 숫자를 눌러 직접 바꿀 수도 있어요' : '운지 추천을 껐어요 (직접 칠한 색은 남아요)'); });
 $('vPicks').onclick = () => mutate(() => { song.view.picks = !song.view.picks; if (!song.view.picks) song.measures.forEach(m => m.beats.forEach(b => delete b.pa)); syncToolbar(); status(song.view.picks ? '박자 위치에 맞춰 ⊓(다운)/V(업)를 추천했어요. 파란색 = 추천, 위 칸을 누르면 직접 입력' : '피킹 추천을 껐어요'); });
 $('vNames').onchange = e => mutate(() => { song.view.names = e.target.checked; });
 $('vFnums').onchange = e => mutate(() => { song.view.fingerNums = e.target.checked; });
-$('bAutoRhythm').onclick = () => mutate(() => { let c = 0; song.measures.forEach((m, i) => { if (m.beats.length && measureFill(m) !== measureCapacity(measureTs(song, i))) { suggestRhythm(song, i); c++; } }); status(c ? `박자가 안 맞던 마디 ${c}개의 리듬을 자동으로 맞췄어요` : '모든 마디의 박자가 이미 맞아요'); });
+$('bAutoRhythm').onclick = () => mutate(() => { let c = 0; song.measures.forEach((m, i) => { if (m.beats.length && measureFill(m) !== measureCapacity(measureTs(song, i))) { const cs = rhythmCandidates(song, i); const best = cs.find(x => keepsManual(m, x)) || cs[0]; if (best) { applyTicks(m, best.ticks); c++; } } }); status(c ? `박자가 안 맞던 마디 ${c}개의 리듬을 자동으로 맞췄어요` : '모든 마디의 박자가 이미 맞아요'); });
 $('bClearFingers').onclick = () => mutate(() => { song.measures.forEach(m => m.beats.forEach(b => b.notes.forEach(n => delete n.fm))); status('직접 칠한 손가락 색을 모두 지웠어요'); });
 
 // 파일

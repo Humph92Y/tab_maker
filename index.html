@@ -73,7 +73,8 @@
       <button id="bPickU" title="업 피킹 (U)">V<small>업</small></button>
     </div><div class="rl">피킹</div></div>
     <div class="rg"><div class="rb col">
-      <label><input type="checkbox" id="autoNext" checked> 마디가 차면 다음 마디로</label>
+      <label title="숫자만 넣고 M(마디)을 누르거나 다른 마디로 가면, 음표 길이를 자동으로 맞춰줘요. 직접 고른 길이는 그대로 둬요"><input type="checkbox" id="autoFit" checked> ✨ 리듬 자동 맞춤 (마디를 떠날 때)</label>
+      <label><input type="checkbox" id="autoNext"> 마디가 차면 다음 마디로</label>
       <label><input type="checkbox" id="previewOn" checked> 입력할 때 소리</label>
       <label><input type="checkbox" id="padOn"> 화면 숫자 패드 (터치용)</label>
     </div><div class="rl">옵션</div></div>
@@ -153,12 +154,14 @@
     <div class="rg"><div class="rb col">
       <label><input type="checkbox" id="vFnums"> 손가락 번호 표시</label>
       <label><input type="checkbox" id="vNames"> 음 이름 표시</label>
+      <label><input type="checkbox" id="vTeach" checked> 👩‍🏫 선생님 설명 (클릭한 마디 아래)</label>
     </div><div class="rl">표시</div></div>
   </div>
 
   <div class="ribbon" data-panel="help">
     <div class="rg"><div class="rb">
       <button id="bHelp" class="tall"><span class="ic">⌨</span>단축키 전체 보기</button>
+      <button id="bTheory" class="tall"><span class="ic">🎵</span>음악 기초</button>
     </div><div class="rl">도움말 (F1)</div></div>
     <div class="rg wide"><div class="rb col helptxt">
       <div>① 줄 위를 클릭 → ② 숫자(프렛) 입력 → ③ <b>Enter</b> = 저장하고 다음 칸으로</div>
@@ -182,7 +185,7 @@
 <div id="helpModal" class="modal hidden no-print">
   <div class="modalbox">
     <button class="pclose" id="helpClose">✕</button>
-    <h2>⌨ 단축키 안내</h2>
+    <h2>⌨ 단축키 안내 <button id="bTheory2" class="linkbtn">🎵 음악 기초 공부하기 →</button></h2>
     <div class="helpgrid">
       <div><h3>입력</h3>
         <table>
@@ -236,6 +239,78 @@
         <h3>손가락 색</h3>
         <p><span class="sw" style="background:#1d6fe0"></span>검지 <span class="sw" style="background:#14a04a"></span>중지 <span class="sw" style="background:#e8730c"></span>약지 <span class="sw" style="background:#9b30e8"></span>새끼</p>
       </div>
+    </div>
+  </div>
+</div>
+
+
+<div id="theoryModal" class="modal hidden no-print">
+  <div class="modalbox theory">
+    <button class="pclose" id="theoryClose">✕</button>
+    <h2>🎵 기타 타브를 위한 음악 기초</h2>
+    <p class="muted">처음엔 다 외울 필요 없어요. 악보를 만들다 헷갈릴 때마다 여기서 찾아보세요.</p>
+    <div class="tgrid">
+      <section><h3>1. 타브(TAB) 읽는 법</h3>
+        <p>가로줄 6개 = 기타 줄 6개예요. <b>맨 위 줄이 가장 가는 1번 줄(높은 미)</b>, 맨 아래가 가장 굵은 6번 줄(낮은 미)이에요.</p>
+        <p>줄 위의 숫자 = 왼손으로 누를 <b>프렛 번호</b>. 0은 아무것도 누르지 않고 치는 <b>개방현</b>이에요.</p>
+        <p>숫자가 위아래로 같이 있으면 동시에 치는 <b>화음</b>, 옆으로 늘어서 있으면 왼쪽부터 차례로 쳐요.</p>
+        <p>타브 숫자는 <b>어디를 누르는지</b>만 알려줘요. <b>얼마나 길게</b>는 아래 음표(리듬)가 알려줘요.</p>
+      </section>
+      <section><h3>2. 음표 길이 (4/4박자 기준)</h3>
+        <table><tr><th>모양</th><th>이름</th><th>길이</th><th>한 마디에</th></tr>
+          <tr><td>𝅝</td><td>온음표</td><td>4박</td><td>1개</td></tr>
+          <tr><td>𝅗𝅥</td><td>2분음표</td><td>2박</td><td>2개</td></tr>
+          <tr><td>♩</td><td>4분음표</td><td>1박</td><td>4개</td></tr>
+          <tr><td>♪</td><td>8분음표</td><td>½박</td><td>8개</td></tr>
+          <tr><td>𝅘𝅥𝅯</td><td>16분음표</td><td>¼박</td><td>16개</td></tr></table>
+        <p>꼬리(깃발)가 하나 늘 때마다 길이가 <b>절반</b>이 돼요. 여러 개가 이어질 땐 꼬리 대신 <b>가로 막대(빔)</b>로 묶어요: 막대 1개 = 8분, 2개 = 16분.</p>
+        <p class="tipline">💡 이 프로그램에서는 숫자만 넣고 <b>M</b>을 누르면 길이를 자동으로 맞춰줘요.</p>
+      </section>
+      <section><h3>3. 쉼표 (소리를 쉬는 길이)</h3>
+        <table><tr><th>모양</th><th>이름</th><th>길이</th></tr>
+          <tr><td>𝄻</td><td>온쉼표</td><td>4박</td></tr>
+          <tr><td>𝄼</td><td>2분쉼표</td><td>2박</td></tr>
+          <tr><td>𝄽</td><td>4분쉼표</td><td>1박</td></tr>
+          <tr><td>𝄾</td><td>8분쉼표</td><td>½박</td></tr>
+          <tr><td>𝄿</td><td>16분쉼표</td><td>¼박</td></tr></table>
+        <p>쉼표 자리에서는 줄에 손을 살짝 대서 소리를 멈춰요.</p>
+      </section>
+      <section><h3>4. 점음표 · 셋잇단 · 붙임줄</h3>
+        <p><b>점(.)</b>: 원래 길이의 <b>1.5배</b>. 예) ♩. = 1박 반, ♪. = ¾박. 보통 짧은 음과 짝을 이뤄요 (♪. + 𝅘𝅥𝅯 = 1박).</p>
+        <p><b>셋잇단(3)</b>: 2개 들어갈 자리에 <b>3개를 똑같이</b> 넣어요. “트-리-플” 하고 세요.</p>
+        <p><b>붙임줄 ⌒ (tie)</b>: 같은 음 두 개를 이으면 <b>다시 치지 않고</b> 길게 이어요. 타브에서는 뒤 숫자가 (5)처럼 괄호로 나와요.</p>
+      </section>
+      <section><h3>5. 박자표 · 마디 · 박자 세기</h3>
+        <p><b>4/4</b> = 위 숫자 4: 한 마디에 4박, 아래 숫자 4: 4분음표를 1박으로. 가장 흔해요.</p>
+        <p><b>3/4</b> = 왈츠처럼 “쿵짝짝” 3박. <b>6/8</b> = 8분음표 6개, “하나둘셋 넷다섯여섯” 두 덩어리.</p>
+        <p><b>마디</b> = 세로줄 사이 칸. 마디마다 음표 길이 합이 박자표와 같아야 해요. 안 맞으면 ⚠가 뜨고, 누르면 고치는 법을 알려줘요.</p>
+        <p><b>세는 법</b>: 4분음표 “하나 둘 셋 넷”, 8분음표 “하나 앤 둘 앤…”, 16분음표 “하나 이 앤 아 둘 이 앤 아…”.</p>
+        <p><b>BPM</b> = 1분에 몇 박인지. 60이면 1초에 한 박, 120이면 두 배 빨라요.</p>
+        <p><b>못갖춘마디</b> = 곡 첫 마디가 박자보다 짧게 시작하는 경우. 정상이에요.</p>
+      </section>
+      <section><h3>6. 오른손: 피킹 기호</h3>
+        <p><b>⊓</b> = 다운 피킹(위에서 아래로), <b>V</b> = 업 피킹(아래에서 위로).</p>
+        <p>기본 규칙: 손목은 시계추처럼 계속 위아래로 움직이고, <b>정박(하나, 둘…)은 다운</b>, <b>엇박(앤)은 업</b>.</p>
+        <p><b>P.M.</b> 팜뮤트 = 손날을 브릿지 쪽 줄에 얹고 “퉁퉁”.  <b>let ring</b> = 소리를 계속 울리게.</p>
+      </section>
+      <section><h3>7. 왼손: 주법 기호</h3>
+        <table>
+          <tr><td>5/7, 7\5</td><td>슬라이드: 누른 채 미끄러뜨리기</td></tr>
+          <tr><td>5 h 7</td><td>해머온: 피킹 없이 다른 손가락으로 “탁” 눌러 소리</td></tr>
+          <tr><td>7 p 5</td><td>풀오프: 손가락을 튕기듯 떼서 아래 음 소리</td></tr>
+          <tr><td>↑ full / ½</td><td>벤딩: 줄을 밀어 올려 음을 한 음 / 반음 올리기</td></tr>
+          <tr><td>~~~</td><td>비브라토: 누른 채 살살 흔들기</td></tr>
+          <tr><td>x</td><td>데드노트: 누르지 않고 대기만 하고 “칙”</td></tr>
+          <tr><td>(5)</td><td>고스트노트(아주 약하게) 또는 붙임줄</td></tr>
+          <tr><td>&lt;12&gt;</td><td>하모닉: 프렛 위에 살짝 대고 종소리</td></tr>
+          <tr><td>작은 숫자</td><td>꾸밈음: 다음 음 직전에 아주 짧게</td></tr>
+        </table>
+      </section>
+      <section><h3>8. 손가락 번호와 색</h3>
+        <p><span class="sw" style="background:#1d6fe0"></span><b>1 검지</b>  <span class="sw" style="background:#14a04a"></span><b>2 중지</b>  <span class="sw" style="background:#e8730c"></span><b>3 약지</b>  <span class="sw" style="background:#9b30e8"></span><b>4 새끼</b>  T 엄지</p>
+        <p><b>한 손가락 한 프렛</b>: 검지를 5프렛에 두면 중지 6, 약지 7, 새끼 8프렛을 맡아요. 손을 덜 움직여서 편해요.</p>
+        <p>엄지는 넥 뒤 가운데쯤에 두고, 손가락은 프렛(쇠 막대) 바로 뒤를 눌러야 깨끗한 소리가 나요.</p>
+      </section>
     </div>
   </div>
 </div>

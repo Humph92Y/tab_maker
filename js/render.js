@@ -91,11 +91,10 @@ function renderScore(el, song, st) {
       const fill = measureFill(m), cap = measureCapacity(mm.ts);
       let cls = 'mnum';
       let tip = '';
-      if (!print && m.check) { cls += ' under'; tip = '자동 인식한 마디예요. 원본과 한 번 확인해 주세요'; }
-      else if (!print && m.beats.length) {
-        if (fill > cap) { cls += ' over'; tip = '박자가 넘쳐요'; }
-        else if (fill < cap && mi < song.measures.length - 1) { cls += ' under'; tip = '박자가 모자라요'; }
-      }
+      const prob = print ? null : measureProblem(song, mi);
+      if (prob === 'over') { cls += ' over'; tip = '박자가 넘쳐요 · 눌러서 해결 방법 보기'; }
+      else if (prob === 'under') { cls += ' under'; tip = '박자가 모자라요 · 눌러서 해결 방법 보기'; }
+      else if (prob === 'check') { cls += ' under'; tip = '자동 인식한 마디예요. 원본과 한 번 확인해 주세요'; }
       o += `<text x="${mm.x + 3}" y="${R.numY}" class="${cls}" data-measure="${mi}">${mi + 1}${tip ? ' ⚠' : ''}<title>${tip || '마디 설정'}</title></text>`;
       if (m.section) o += `<text x="${mm.x + 26}" y="${R.numY}" class="section">${esc(m.section)}</text>`;
       if (!print) o += `<rect class="hit" x="${mm.x}" y="0" width="${Math.max(24, mm.sw * 0.4)}" height="20" data-measure="${mi}"/>`;
@@ -199,7 +198,8 @@ function renderScore(el, song, st) {
     html += `<svg class="system" data-si="${si}" width="${W}" height="${R.height}" viewBox="0 0 ${W} ${R.height}" xmlns="http://www.w3.org/2000/svg">${o}</svg>`;
   });
   el.innerHTML = html;
-  return { beatPos, notePos, systems: systems.length };
+  const msys = {}; systems.forEach((sys, si) => sys.forEach(mm => { msys[mm.mi] = si; }));
+  return { beatPos, notePos, systems: systems.length, msys };
 }
 
 function pickGlyph(x, y, p, manual) {

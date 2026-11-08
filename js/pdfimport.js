@@ -315,6 +315,41 @@ const PdfImport = (() => {
   function splitTicks(t) { // 남은 길이를 쉼표 길이들로
     const out = []; for (const d of [1, 2, 4, 8, 16, 32]) { while (t >= TK[d] - 1) { out.push(d); t -= TK[d]; } } return out;
   }
+  // 간격으로 길이 추측: 악보 프로그램은 긴 음일수록 뒤에 빈 공간을 많이 둬요.
+  // 간격^k 비율로 나누고, 실제 음표 길이로 반올림한 뒤 합이 딱 맞게 조정.
+  const QV = [1920, 1440, 960, 720, 480, 360, 240, 180, 120, 60];
+  const T2D = { 1920: [1, 0], 1440: [2, 1], 960: [2, 0], 720: [4, 1], 480: [4, 0], 360: [8, 1], 240: [8, 0], 180: [16, 1], 120: [16, 0], 60: [32, 0] };
+  function quantizeBySpacing(items, m, cap) {
+    const real = items.filter(it => !(it.b && it.b.grace));
+    if (!real.length || cap < real.length * 60) return false;
+    const gaps = real.map((it, i) => (i + 1 < real.length ? real[i + 1].x : m.x1) - it.x);
+    if (gaps.length > 1) { const mx = Math.max(...gaps.slice(0, -1)); gaps[gaps.length - 1] = Math.min(gaps[gaps.length - 1] * 0.85, mx * 2.2); }
+    for (let i = 0; i < gaps.length; i++) gaps[i] = Math.max(1, gaps[i]);
+    let best = null;
+    for (const k of [1, 1.35, 1.7, 2.1]) {
+      const w = gaps.map(g => Math.pow(g, k)), ws = w.reduce((a, b) => a + b, 0);
+      const raw = w.map(v => v / ws * cap);
+      const q = raw.map(r => QV.reduce((a, v) => Math.abs(Math.log(v / r)) < Math.abs(Math.log(a / r)) ? v : a, QV[0]));
+      let diff = cap - q.reduce((a, b) => a + b, 0), guard = 0;
+      while (diff !== 0 && guard++ < 300) {
+        let mv = null;
+        q.forEach((v, i) => {
+          const j = QV.indexOf(v), nv = diff > 0 ? QV[j - 1] : QV[j + 1];
+          if (!nv || Math.abs(nv - v) > Math.abs(diff)) return;
+          const cost = Math.abs(Math.log(nv / raw[i])) - Math.abs(Math.log(v / raw[i]));
+          if (!mv || cost < mv.cost) mv = { i, nv, cost };
+        });
+        if (!mv) break;
+        diff -= mv.nv - q[mv.i]; q[mv.i] = mv.nv;
+      }
+      if (diff !== 0) continue;
+      const err = q.reduce((a, v, i) => a + Math.abs(Math.log(v / raw[i])), 0) + new Set(q).size * 0.15;
+      if (!best || err < best.err) best = { err, q };
+    }
+    if (!best) return false;
+    real.forEach((it, i) => { const [d, dot] = T2D[best.q[i]]; const tgt = it.b || it.rest; tgt.dur = d; tgt.dot = !!dot; tgt.trip = false; });
+    return true;
+  }
   function fitMeasure(m, cap, warnings, label) {
     let items = m.beats.map(b => ({ x: b.x, b }));
     // 박이 있는 위치의 쉼표는 무시, 나머지 쉼표 추가
@@ -324,7 +359,8 @@ const PdfImport = (() => {
     let s = sum();
     // 길이를 모르는 박: 남은 길이를 나눠 가짐
     const unkB = m.beats.filter(b => !b.grace && !b.dur);
-    if (unkB.length) {
+    if (unkB.length && !m.beats.some(b => b.measured) && quantizeBySpacing(items, m, cap)) { m.guessed = true; m.spaced = true; s = sum(); }
+    else if (unkB.length) {
       const known = s - items.filter(it => it.rest && !it.rest.known).reduce((a, it) => a + TK[it.rest.dur], 0);
       const each = (cap - known) / unkB.length;
       let d = [1, 2, 4, 8, 16, 32].find(d => Math.abs(TK[d] - each) < 1), dot = false;
@@ -364,6 +400,8 @@ const PdfImport = (() => {
       if (fixed) m.guessed = true;
       s = sum();
     }
+    // 그래도 넘치면: 간격 비율로 다시 계산 (넘치는 마디는 남기지 않음)
+    if (s > cap && quantizeBySpacing(items, m, cap)) { m.guessed = true; s = sum(); }
     if (s < cap && m.beats.length) {
       // 오선보가 없거나 쉼표를 못 찾음: 가장 넓은 빈 곳에 쉼표
       const gaps = [];
@@ -382,6 +420,7 @@ const PdfImport = (() => {
       } else m.guessed = true;
       s = sum();
     }
+    if (s > cap && m.beats.length && quantizeBySpacing(items, m, cap)) { m.guessed = true; s = sum(); }
     m.items = items;
     m.sum = s;
     if (s !== cap && m.beats.length) warnings.push(label);

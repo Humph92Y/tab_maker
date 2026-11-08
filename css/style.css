@@ -169,3 +169,42 @@ svg.system { display: block; margin: 0 0 4px; user-select: none; overflow: visib
 .padhide { color: #666; }
 body.padopen #page { margin-bottom: 170px; }
 @media (pointer: coarse) { .hit, .ins { cursor: default; } .ins { fill: rgba(20,160,74,.08); } }
+
+/* ===== 리듬 후보 / 진단 / 선생님 설명 ===== */
+.popup .ph2 { margin: 8px 0 4px; font-weight: 600; font-size: 13px; }
+.cands { display: flex; flex-direction: column; gap: 3px; margin-bottom: 6px; }
+.cand { display: flex; align-items: center; gap: 6px; padding: 3px 6px; border-radius: 6px; background: #f5f7fb; }
+.cand.on { background: #e3eeff; outline: 1px solid #9cc0ff; }
+.cand .cl { min-width: 150px; font-size: 12px; }
+.cicons { font-size: 17px; letter-spacing: 1px; flex: 1; }
+.ri { display: inline-block; min-width: 14px; text-align: center; }
+.ri sup { font-size: 9px; }
+.diag { border-radius: 8px; padding: 8px 10px; margin: 4px 0 8px; background: #fff6e8; border: 1px solid #f3c27a; }
+.diag.over { background: #fff0ee; border-color: #f0a197; }
+.diag .dt { font-weight: 700; margin-bottom: 4px; }
+.diag .dx { font-size: 13px; margin: 3px 0; line-height: 1.5; }
+.diag .fixes { margin: 6px 0; display: flex; flex-direction: column; gap: 4px; }
+.diag .fix { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.popup button.primary, .diag button.primary { background: #1f6feb; color: #fff; border-color: #1f6feb; font-weight: 600; }
+#minfo { cursor: pointer; text-decoration: underline dotted; }
+.teach { margin: 2px 0 14px 40px; padding: 10px 14px; background: #fffdf2; border: 1px solid #eadfa8; border-left: 4px solid #e8b400; border-radius: 8px; font-size: 13.5px; line-height: 1.6; max-width: 980px; }
+.teach .th { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+.teach .tbtns button { margin-left: 4px; padding: 2px 8px; font-size: 12px; }
+.teach .tx { margin: 2px 0 6px; }
+.tchips { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0; }
+.tchip { display: inline-flex; flex-direction: column; align-items: center; min-width: 44px; padding: 2px 6px; border: 1px solid #ddd; border-radius: 6px; background: #fff; font-size: 12px; line-height: 1.3; }
+.tchip i { font-style: normal; font-weight: 700; color: #b06d00; }
+.tchip.rest { color: #999; }
+.tchip.cur { border-color: #1f6feb; box-shadow: 0 0 0 1px #1f6feb; }
+.tsteps { margin: 6px 0; padding-left: 22px; }
+.tsteps li { margin: 3px 0; }
+.tsteps .tex { color: #6b4e00; font-size: 12.5px; margin-left: 4px; }
+.ttips div { margin: 3px 0; }
+.linkbtn { font-size: 13px; margin-left: 12px; vertical-align: middle; }
+.theory .tgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 10px 22px; }
+.theory section p { margin: 4px 0; font-size: 13.5px; line-height: 1.55; }
+.theory table { border-collapse: collapse; font-size: 13px; margin: 4px 0; }
+.theory td, .theory th { border-bottom: 1px solid #eee; padding: 2px 8px; text-align: left; }
+.theory td:first-child { font-size: 17px; white-space: nowrap; }
+.tipline { background: #eef5ff; padding: 4px 8px; border-radius: 6px; }
+@media print { .teach { display: none; } }
