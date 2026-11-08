@@ -10,6 +10,8 @@ const PdfImport = (() => {
   const SMUFL_FLAG = { 0xE240: 1, 0xE241: 1, 0xE242: 2, 0xE243: 2, 0xE244: 3, 0xE245: 3, 0xE246: 4, 0xE247: 4 };
   const SMUFL_HEAD = { 0xE0A2: 1, 0xE0A3: 2, 0xE0A4: 4, 0xE0A9: 4, 0xE0A8: 2, 0xE0A0: 1 };
   const SMUFL_DOT = 0xE1E7;
+  const SMUFL_STAC_A = 0xE4A2, SMUFL_STAC_B = 0xE4A3;
+  let DBG = null, CUR_PAGE = 0; // 디버그: 쉼표 후보와 판단 이유 기록
   const SMUFL_TS = { 0xE080: 0, 0xE081: 1, 0xE082: 2, 0xE083: 3, 0xE084: 4, 0xE085: 5, 0xE086: 6, 0xE087: 7, 0xE088: 8, 0xE089: 9 };
 
   const mul = (m, n) => [m[0] * n[0] + m[2] * n[1], m[1] * n[0] + m[3] * n[1], m[0] * n[2] + m[2] * n[3], m[1] * n[2] + m[3] * n[3], m[0] * n[4] + m[2] * n[5] + m[4], m[1] * n[4] + m[3] * n[5] + m[5]];
@@ -144,21 +146,42 @@ const PdfImport = (() => {
       beats.sort((p, q) => p.x - q.x);
       measures.push({ x0: a, x1: b, beats, rests: [], tsMark: null, sysFirst: i === 0 });
     }
-    if (stdStaff) readRhythm(measures, stdStaff, texts, shapes, bx, tab);
+    if (stdStaff) readRhythm(measures, stdStaff, texts, shapes, bx, tab, ctx && ctx.ceil);
     readTechniques(measures, tab, stdStaff, texts, shapes);
     return measures;
   }
 
   // ---------- 4. 리듬 읽기 (오선보) ----------
-  function readRhythm(measures, st, texts, shapes, bx, tab) {
+  function readRhythm(measures, st, texts, shapes, bx, tab, ceil) {
     const sp = st.sp;
-    const zoneTop = st.top + sp * 7, zoneBot = st.bottom - sp * 7;
+    // 위쪽에 다른 악기 오선이 있으면 그 중간까지만 봄 (다른 오선의 쉼표·음표를 섞지 않도록)
+    const zoneTop = ceil ? Math.min(st.top + sp * 7, (st.top + ceil) / 2) : st.top + sp * 7, zoneBot = st.bottom - sp * 7;
     const inZone = s => s.y1 <= zoneTop && s.y0 >= zoneBot;
     const nearBar = x => bx.some(b => Math.abs(b - x) < 1.6);
     const stems = verticals(shapes).filter(v => inZone(v) && v.h > sp * 1.8 && v.h < sp * 14 && !nearBar(v.cx) && !(v.y0 <= st.bottom + 0.5 && v.y1 >= st.top - 0.5 && Math.abs(v.h - (st.top - st.bottom)) < 1));
     const beams = shapes.filter(s => s.kind === 'F' && !s.curve && (s.n === 4 || s.n === 5) && s.w > 2.5 && inZone(s) && s.h < sp * 9 && (() => { const th = beamThick(s); return th > sp * 0.2 && th < sp * 0.9; })());
     const glyphs = texts.filter(t => t.str.length === 1 && t.str.charCodeAt(0) >= 0xE000 && t.y < zoneTop && t.y > zoneBot);
     const gcode = t => t.str.charCodeAt(0);
+    // 점(길이 점·스타카토 점 공통 후보): 그림 도형 또는 SMuFL 글자
+    const isDot = s => s.kind === 'F' && s.curve && s.w > 1.1 && s.w < sp * 0.6 && s.h > 1.1 && s.h < sp * 0.6 && Math.abs(s.w - s.h) < 0.45;
+    const dotPts = shapes.filter(s => isDot(s) && inZone(s)).map(s => ({ x: s.cx, y: s.cy, src: 'vector' }))
+      .concat(glyphs.filter(t => gcode(t) === SMUFL_DOT).map(t => ({ x: t.x + t.w / 2, y: t.y, src: 'smufl' })));
+    // 음표머리 (임시표·스타카토 판단용)
+    const heads = shapes.filter(s => s.kind === 'F' && s.curve && s.w > sp * 0.9 && s.w < sp * 1.7 && s.h > sp * 0.6 && s.h < sp * 1.4 && inZone(s)).map(s => ({ x0: s.x0, x1: s.x1, x: s.cx, y: s.cy }))
+      .concat(glyphs.filter(t => SMUFL_HEAD[gcode(t)]).map(t => ({ x0: t.x, x1: t.x + t.w, x: t.x + t.w / 2, y: t.y })));
+    // x0~x1 안의 가장 왼쪽 점에서 시작해 같은 높이로 바로 이어지는 점 개수 (최대 2)
+    function dotsAfter(x0, x1, yLo, yHi, skip) {
+      const c = dotPts.filter(d => d.x > x0 && d.x < x1 && d.y > yLo && d.y < yHi && !skip(d)).sort((a, b) => a.x - b.x);
+      if (!c.length) return { n: 0 };
+      let n = 1, last = c[0];
+      while (n < 2) {
+        const nx = dotPts.find(d => d.x > last.x + sp * 0.35 && d.x < last.x + sp * 1.3 && Math.abs(d.y - c[0].y) < sp * 0.35);
+        if (!nx) break; n++; last = nx;
+      }
+      return { n, first: c[0] };
+    }
+    const graceStems = verticals(shapes).filter(v => inZone(v) && v.h > sp * 1.2 && v.h <= sp * 1.8);
+    const log = e => { if (DBG) DBG.push(Object.assign({ page: CUR_PAGE }, e)); };
     // 박자표
     const tsg = glyphs.filter(t => SMUFL_TS[gcode(t)] !== undefined || gcode(t) === 0xE08A || gcode(t) === 0xE08B);
     measures.forEach(m => {
@@ -178,71 +201,137 @@ const PdfImport = (() => {
         for (const a of big) for (const b of big) if (a !== b && Math.abs(a.x0 - b.x0) < 1.5 && a.cy > b.cy + sp * 1.5) m.tsMark = 'unknown';
       }
     });
+    // 붙임줄/이음줄 후보: 가늘고 납작한 곡선
+    const arcs = shapes.filter(s => s.kind === 'F' && s.curve && s.w > sp * 0.8 && s.h < sp * 1.3 && s.w > s.h * 2.2 && s.cy < st.top + sp * 3 && s.cy > st.bottom - sp * 3);
+    // 한 음(기둥·빔·꼬리·머리·점)의 길이 읽기. stem 을 주면 그 기둥을 씀
+    function noteAt(x, stem) {
+      let best = stem || null, bd = 1e9;
+      if (!stem) stems.forEach(v => { const d = Math.abs(v.cx - x); if (d < Math.max(5.5, sp * 1.4) && d < bd) { bd = d; best = v; } });
+      let flags = 0;
+      if (best) {
+        const lv = [];
+        beams.forEach(b => {
+          if (best.cx < b.x0 - 0.8 || best.cx > b.x1 + 0.8) return;
+          if (b.y1 < best.y0 - sp * 0.8 || b.y0 > best.y1 + sp * 0.8) return;
+          lv.push(b);
+        });
+        // 같은 높이 중복 제거
+        const ys = []; lv.forEach(b => { const yAt = beamYAt(b, best.cx); if (!ys.some(y => Math.abs(y - yAt) < sp * 0.45)) ys.push(yAt); });
+        flags = ys.length;
+        if (!flags) {
+          const fg = glyphs.find(t => SMUFL_FLAG[gcode(t)] && Math.abs(t.x - best.cx) < 2.5);
+          if (fg) flags = SMUFL_FLAG[gcode(fg)];
+          else {
+            const fs = shapes.filter(s => s.kind === 'F' && s.curve && s.x0 > best.cx - 1 && s.x0 < best.cx + 1.5 && s.w > sp * 0.8 && s.w < sp * 2 && s.h > sp * 2 && (Math.abs(s.y1 - best.y1) < sp || Math.abs(s.y0 - best.y0) < sp));
+            if (fs.length) flags = fs.reduce((a, s) => Math.max(a, s.h > sp * 4.4 ? 3 : s.h > sp * 3.3 ? 2 : 1), 0);
+          }
+        }
+      }
+      // 머리 모양 (온/2분): 글자 기호, 또는 바깥 도형 안에 구멍(안쪽 도형)이 있으면 빈 머리
+      const head = glyphs.filter(t => SMUFL_HEAD[gcode(t)] && Math.abs(t.x + t.w / 2 - x) < sp * 1.5).sort((a, b) => Math.abs(a.x + a.w / 2 - x) - Math.abs(b.x + b.w / 2 - x))[0];
+      let headDur = head ? SMUFL_HEAD[gcode(head)] : null;
+      if (!head) {
+        const outer = shapes.filter(s => s.kind === 'F' && s.curve && Math.abs(s.cx - x) < sp * 1.6 && s.w > sp * 0.9 && s.w < sp * 2 && s.h > sp * 0.7 && s.h < sp * 1.5 && inZone(s));
+        const hollow = outer.some(a => shapes.some(b => a !== b && b.kind === 'F' && b.x0 >= a.x0 && b.x1 <= a.x1 && b.y0 >= a.y0 && b.y1 <= a.y1 && b.w < a.w * 0.9 && b.w > a.w * 0.4 && b.h > a.h * 0.3));
+        if (hollow) headDur = 2;
+      }
+      const r = { stem: best, measured: !!best || !!head };
+      if (flags > 0) r.dur = Math.min(32, 4 * Math.pow(2, flags));
+      else if (best) r.dur = headDur === 2 ? 2 : 4;
+      // 기둥 없는 빈 머리 = 온음표 (글자 기호는 모양 번호를 그대로)
+      else r.dur = headDur === 1 ? 1 : headDur === 2 ? (head ? 2 : 1) : null; // 모르면 나중에 박자 합으로 결정
+      // 점: 음표 오른쪽 같은 높이에 이어진 점 개수 (1 = 점, 2 = 겹점)
+      // 다른 음표머리 바로 위/아래 점(스타카토)은 길이 점으로 세지 않음
+      const others = heads.filter(h => Math.abs(h.x - x) > sp);
+      const mine = heads.filter(h => Math.abs(h.x - x) < sp * 1.2), hy = mine.map(h => h.y);
+      // 점의 높이: 이 음 머리 높이 근처 (덧줄 위 높은 음도 포함). 머리를 못 찾으면 오선 범위
+      const yLo = mine.length ? Math.min(...hy) - sp * 0.8 : st.bottom - sp, yHi = mine.length ? Math.max(...hy) + sp * 0.8 : st.top + sp;
+      const nd = dotsAfter(x + sp * 0.9, x + sp * 3, yLo, yHi, d => others.some(h => Math.abs(h.x - d.x) < sp * 0.5));
+      r.dot = nd.n === 2 ? 2 : nd.n === 1;
+      // 스타카토: 이 음의 머리 바로 위나 아래(옆이 아님)에 있는 점
+      const own = heads.filter(h => Math.abs(h.x - x) < sp);
+      const stG = glyphs.some(t => (gcode(t) === SMUFL_STAC_A || gcode(t) === SMUFL_STAC_B) && Math.abs(t.x + t.w / 2 - x) < sp);
+      const stS = own.length && dotPts.some(d => d.src === 'vector' && own.some(h => Math.abs(h.x - d.x) < sp * 0.5 && Math.abs(h.y - d.y) < sp * 2.2) && own.every(h => Math.abs(h.y - d.y) > sp * 0.6));
+      r.stac = !!(stG || stS);
+      return r;
+    }
     // 박마다 기둥/빔/꼬리
     measures.forEach(m => {
       m.beats.forEach(bt => {
         if (bt.grace) { bt.dur = 8; return; }
-        let best = null, bd = 1e9;
-        stems.forEach(v => { const d = Math.abs(v.cx - bt.x); if (d < Math.max(5.5, sp * 1.4) && d < bd) { bd = d; best = v; } });
-        bt.stem = best;
-        let flags = 0;
-        if (best) {
-          const lv = [];
-          beams.forEach(b => {
-            if (best.cx < b.x0 - 0.8 || best.cx > b.x1 + 0.8) return;
-            if (b.y1 < best.y0 - sp * 0.8 || b.y0 > best.y1 + sp * 0.8) return;
-            lv.push(b);
-          });
-          // 같은 높이 중복 제거
-          const ys = []; lv.forEach(b => { const yAt = beamYAt(b, best.cx); if (!ys.some(y => Math.abs(y - yAt) < sp * 0.45)) ys.push(yAt); });
-          flags = ys.length;
-          if (!flags) {
-            const fg = glyphs.find(t => SMUFL_FLAG[gcode(t)] && Math.abs(t.x - best.cx) < 2.5);
-            if (fg) flags = SMUFL_FLAG[gcode(fg)];
-            else {
-              const fs = shapes.filter(s => s.kind === 'F' && s.curve && s.x0 > best.cx - 1 && s.x0 < best.cx + 1.5 && s.w > sp * 0.8 && s.w < sp * 2 && s.h > sp * 2 && (Math.abs(s.y1 - best.y1) < sp || Math.abs(s.y0 - best.y0) < sp));
-              if (fs.length) flags = fs.reduce((a, s) => Math.max(a, s.h > sp * 4.4 ? 3 : s.h > sp * 3.3 ? 2 : 1), 0);
-            }
-          }
-        }
-        // 머리 모양 (온/2분)
-        const head = glyphs.find(t => SMUFL_HEAD[gcode(t)] && Math.abs(t.x + t.w / 2 - bt.x) < sp * 1.5);
-        let headDur = head ? SMUFL_HEAD[gcode(head)] : null;
-        if (!head) {
-          const hs = shapes.filter(s => s.kind === 'F' && s.curve && Math.abs(s.cx - bt.x) < sp * 1.6 && s.w > sp * 0.9 && s.w < sp * 2 && s.h > sp * 0.7 && s.h < sp * 1.5 && inZone(s));
-          const hollow = hs.some(a => hs.some(b => a !== b && b.x0 >= a.x0 && b.x1 <= a.x1 && b.y0 >= a.y0 && b.y1 <= a.y1 && b.w < a.w * 0.85));
-          if (hollow) headDur = 2;
-        }
-        if (flags > 0) bt.dur = Math.min(32, 4 * Math.pow(2, flags));
-        else if (best) bt.dur = headDur === 2 ? 2 : 4;
-        else bt.dur = headDur === 1 ? 1 : headDur === 2 ? 2 : null; // 모르면 나중에 박자 합으로 결정
-        bt.measured = !!best || !!head;
-        // 점
-        const dotG = glyphs.find(t => gcode(t) === SMUFL_DOT && t.x > bt.x + sp * 0.6 && t.x < bt.x + sp * 3);
-        const dotS = shapes.find(s => s.kind === 'F' && s.curve && s.w > 1.1 && s.w < sp * 0.6 && s.h > 1.1 && s.h < sp * 0.6 && Math.abs(s.w - s.h) < 0.45 && s.cx > bt.x + sp * 0.9 && s.cx < bt.x + sp * 3 && s.cy < st.top + sp && s.cy > st.bottom - sp);
-        bt.dot = !!(dotG || dotS);
+        Object.assign(bt, noteAt(bt.x));
       });
+      // 타브 숫자 없이 오선보에만 있는 음 = 붙임줄로 이어진 음 (Guitar Pro는 이어진 음의 숫자를 생략하기도 함)
+      // 증거 세 가지가 모두 있어야 넣음: 짝 없는 기둥 + 그 기둥의 음표머리 + 왼쪽 같은 높이 머리에서 오는 붙임줄
+      const used = new Set(m.beats.map(b => b.stem).filter(Boolean));
+      stems.filter(v => !used.has(v) && v.cx > m.x0 + 2 && v.cx < m.x1 - 2 && v.y0 < st.top + sp * 0.5 && v.y1 > st.bottom - sp * 0.5 && !m.beats.some(b => Math.abs(b.x - v.cx) < Math.max(5.5, sp * 1.4)))
+        .forEach(v => {
+          // 이 기둥에 붙은 음표머리들 (화음이면 여러 개)
+          const sh = heads.filter(h => (Math.abs(h.x1 - v.cx) < sp * 0.4 || Math.abs(h.x0 - v.cx) < sp * 0.4) && h.y > v.y0 - sp * 0.8 && h.y < v.y1 + sp * 0.8);
+          const hd = sh[0];
+          let why = null;
+          // 붙임줄: 같은 높이(같은 음)의 앞 머리에서 이 머리로 오는 곡선. 높이가 다르면 이음줄(슬러)이라 제외
+          const tie = hd && arcs.find(c => sh.some(h2 => c.x1 > h2.x - sp * 2 && c.x1 < h2.x + sp * 0.6 && c.x0 < h2.x - sp * 0.8 && Math.abs(c.cy - h2.y) < sp * 1.6 &&
+            (c.x0 < st.x0 + sp * 6 || heads.some(h => !sh.includes(h) && h.x > c.x0 - sp * 1.5 && h.x < c.x0 + sp * 0.8 && Math.abs(h.y - h2.y) < sp * 0.3))));
+          if (!hd) why = 'no-head'; else if (!tie) why = 'no-tie';
+          if (!why) m.beats.push(Object.assign({ x: hd.x, notes: [], tieFromPrev: true }, noteAt(hd.x, v)));
+          log({ x: v.cx, y: v.cy, method: 'tied-stem', ok: !why, why });
+        });
+      m.beats.sort((p, q) => p.x - q.x);
       // 셋잇단: 박들 근처의 "3"
       texts.filter(t => t.str === '3' && t.x > m.x0 + 6 && t.x < m.x1 - 6 && t.y < zoneTop && t.y > zoneBot && t.y > tab.top + tab.sp * 0.8 && (t.y > st.top + sp * 0.5 || t.y < st.bottom - sp * 2.5)).forEach(t => {
         const cand = m.beats.filter(b => !b.grace).sort((a, b) => Math.abs(a.x - t.x) - Math.abs(b.x - t.x)).slice(0, 3);
         cand.forEach(b => b.trip = true);
       });
-      // 쉼표 (글자 기호)
+      // 쉼표 ① 글자 기호(SMuFL 글꼴): 모양이 글자 번호로 정해져 있어 확실함
       glyphs.filter(t => SMUFL_REST[gcode(t)] && t.x > m.x0 && t.x < m.x1).forEach(t => {
-        const dot = glyphs.some(d => gcode(d) === SMUFL_DOT && d.x > t.x + t.w * 0.8 && d.x < t.x + t.w + sp * 1.8 && Math.abs(d.y - t.y) < sp * 2);
-        m.rests.push({ x: t.x + t.w / 2, dur: SMUFL_REST[gcode(t)], dot, known: true });
+        const nd = dotsAfter(t.x + t.w * 0.8, t.x + t.w + sp * 1.8, t.y - sp * 2, t.y + sp * 2, () => false);
+        const r = { x: t.x + t.w / 2, y: t.y, dur: SMUFL_REST[gcode(t)], dot: nd.n === 2 ? 2 : nd.n === 1, known: true, method: 'smufl' };
+        m.rests.push(r); log({ x: r.x, y: r.y, method: 'smufl', ok: true, dur: r.dur, dot: r.dot });
       });
-      // 쉼표 (그림 기호): 기둥이 없는 큰 도형
-      if (!glyphs.length) {
-        shapes.filter(s => s.kind === 'F' && s.curve && s.cx > m.x0 + 3 && s.cx < m.x1 - 3 && s.h > sp * 1.35 && s.h < sp * 6 && s.w > sp * 0.5 && s.w < sp * 1.5 && s.cy > st.bottom + sp * 0.4 && s.cy < st.top - sp * 0.4)
-          .forEach(s => {
-            if (m.beats.some(b => s.cx > b.x - sp * 2.6 && s.cx < b.x + sp * 0.9)) return; // 임시표(♯♭♮)는 음표 바로 왼쪽
-            if (stems.some(v => Math.abs(v.cx - s.x0) < 1.6 || Math.abs(v.cx - s.x1) < 1.6)) return; // 꼬리
-            if (m.sysFirst && s.cx < st.x0 + sp * 5) return;
-            if (m.rests.some(r => Math.abs(r.x - s.cx) < sp)) return;
-            m.rests.push({ x: s.cx, dur: s.h < sp * 2.2 ? 8 : s.h < sp * 3.2 ? 16 : 4, dot: false, known: false });
-          });
-      }
+      // 쉼표 ② 그림 기호(곡선 도형: 4/8/16/32분 쉼표). 글자 기호가 있어도 항상 확인하고, 겹치면 하나만 씀
+      // 오른쪽부터 보면서 판단 (화음의 임시표는 여러 줄로 왼쪽에 겹쳐 놓이므로)
+      const accs = [];
+      shapes.filter(s => s.kind === 'F' && s.curve && s.cx > m.x0 + 3 && s.cx < m.x1 - 3 && s.h > sp * 1.35 && s.h < sp * 4.6 && s.w > sp * 0.5 && s.w < sp * 1.5 && s.cy > st.bottom - sp * 2 && s.cy < st.top + sp * 2)
+        .sort((p, q) => q.cx - p.cx).forEach(s => {
+          let why = null;
+          const inStaff = s.cy > st.bottom + sp * 0.4 && s.cy < st.top - sp * 0.4; // 쉼표는 오선 안쪽에만
+          if (m.sysFirst && s.cx < st.x0 + sp * 5) why = 'clef';
+          // 꼬리(깃발): 기둥 끝에 붙어 있음(꾸밈음 꼬리는 사선이 기둥을 가로지름). 옆 음표 기둥과 가깝기만 한 것은 꼬리가 아님
+          else if (stems.concat(graceStems).some(v => v.cx > s.x0 - 1.6 && v.cx < s.cx && (Math.abs(s.y1 - v.y1) < sp * 0.45 || Math.abs(s.y0 - v.y0) < sp * 0.45))) why = 'flag';
+          else if (heads.some(h => h.x1 > s.x0 - 0.5 && h.x0 < s.x1 + 0.5 && Math.abs(h.y - s.cy) < s.h / 2 + sp * 0.3)) why = 'touches-head';
+          // 임시표(♯♭♮): 바로 오른쪽에 같은 높이의 음표머리, 또는 바로 오른쪽에 비슷한 크기의 임시표(화음)
+          else if (heads.some(h => h.x0 > s.x1 - sp * 0.4 && h.x0 < s.x1 + sp * 1.0 && Math.abs(h.y - s.cy) < sp * 1.1) ||
+            accs.some(a => a.x0 > s.x0 + sp * 0.2 && a.x0 < s.x1 + sp * 0.8 && Math.abs(a.cy - s.cy) < sp * 3.5 && Math.abs(a.h / s.h - 1) < 0.2)) { why = 'accidental'; accs.push(s); }
+          else if (!inStaff) why = 'ypos';
+          else if (m.rests.some(r => Math.abs(r.x - s.cx) < sp)) why = 'duplicate';
+          const hr = s.h / sp;
+          // 높이로 종류 구분. 8분(약 1.75칸)·4분(약 3칸)은 실제 PDF로 확인함. 4분/16분은 높이가 비슷해서 후보로 둘 다 기록
+          const dur = hr <= 2.2 ? 8 : hr <= 3.4 ? 4 : 32, alt = hr <= 2.2 ? null : hr <= 3.4 ? [16] : [16];
+          if (!why) {
+            const nd = dotsAfter(s.x1 + sp * 0.1, s.x1 + sp * 1.8, st.bottom - sp, st.top + sp, () => false);
+            const r = { x: s.cx, y: s.cy, dur, dot: nd.n === 2 ? 2 : nd.n === 1, known: !alt, alt, method: 'vector-curve' };
+            m.rests.push(r);
+          }
+          if (inStaff) log({ x: s.cx, y: s.cy, w: +(s.w / sp).toFixed(2), h: +hr.toFixed(2), n: s.n, method: 'vector-curve', ok: !why, why, dur });
+        });
+      // 쉼표 ③ 그림 기호(납작한 사각형: 온쉼표는 줄에 매달리고, 2분쉼표는 줄 위에 앉음)
+      shapes.filter(s => s.kind === 'F' && !s.curve && (s.n === 4 || s.n === 5) && s.w > sp * 0.8 && s.w < sp * 1.9 && s.h > sp * 0.3 && s.h < sp * 0.75 && s.cx > m.x0 + 3 && s.cx < m.x1 - 3 && s.y0 > st.bottom - sp * 0.1 && s.y1 < st.top + sp * 0.1)
+        .forEach(s => {
+          const onLine = y => st.lines.some(l => Math.abs(l - y) < sp * 0.15);
+          let why = null, dur = null;
+          if (Math.abs(beamThick(s) - s.h) > 0.3) why = 'slanted';
+          else if (stems.some(v => v.cx > s.x0 - 1.2 && v.cx < s.x1 + 1.2 && v.y0 < s.y1 + sp * 0.3 && v.y1 > s.y0 - sp * 0.3)) why = 'beam';
+          else if (onLine(s.y1) && !onLine(s.y0)) dur = 1;
+          else if (onLine(s.y0) && !onLine(s.y1)) dur = 2;
+          else why = 'not-on-line';
+          if (!why && m.rests.some(r => Math.abs(r.x - s.cx) < sp)) why = 'duplicate';
+          if (!why) {
+            const nd = dotsAfter(s.x1 + sp * 0.1, s.x1 + sp * 1.8, st.bottom - sp, st.top + sp, () => false);
+            m.rests.push({ x: s.cx, y: s.cy, dur, dot: nd.n === 2 ? 2 : nd.n === 1, known: true, method: 'vector-rect' });
+          }
+          log({ x: s.cx, y: s.cy, w: +(s.w / sp).toFixed(2), h: +(s.h / sp).toFixed(2), method: 'vector-rect', ok: !why, why, dur });
+        });
     });
   }
   function beamThick(b) {
@@ -311,19 +400,23 @@ const PdfImport = (() => {
 
   // ---------- 6. 박자 합 규칙으로 보정 ----------
   const TK = { 1: 1920, 2: 960, 4: 480, 8: 240, 16: 120, 32: 60 };
-  const tk = b => (b.grace || !b.dur) ? 0 : TK[b.dur] * (b.dot ? 1.5 : 1) * (b.trip ? 2 / 3 : 1);
-  function splitTicks(t) { // 남은 길이를 쉼표 길이들로
-    const out = []; for (const d of [1, 2, 4, 8, 16, 32]) { while (t >= TK[d] - 1) { out.push(d); t -= TK[d]; } } return out;
-  }
+  const dotMul = d => d === 2 ? 1.75 : d ? 1.5 : 1;
+  const tk = b => (b.grace || !b.dur) ? 0 : TK[b.dur] * dotMul(b.dot) * (b.trip ? 2 / 3 : 1);
+  const rtk = r => TK[r.dur] * dotMul(r.dot);
   // 간격으로 길이 추측: 악보 프로그램은 긴 음일수록 뒤에 빈 공간을 많이 둬요.
   // 간격^k 비율로 나누고, 실제 음표 길이로 반올림한 뒤 합이 딱 맞게 조정.
   const QV = [1920, 1440, 960, 720, 480, 360, 240, 180, 120, 60];
   const T2D = { 1920: [1, 0], 1440: [2, 1], 960: [2, 0], 720: [4, 1], 480: [4, 0], 360: [8, 1], 240: [8, 0], 180: [16, 1], 120: [16, 0], 60: [32, 0] };
+  // 원본에서 확실히 읽은 쉼표(fixed)는 길이를 바꾸지 않고, 나머지 길이만 간격으로 나눔
   function quantizeBySpacing(items, m, cap) {
-    const real = items.filter(it => !(it.b && it.b.grace));
+    const all = items.filter(it => !(it.b && it.b.grace));
+    const isFixed = it => it.rest && it.rest.known;
+    const allGaps = all.map((it, i) => (i + 1 < all.length ? all[i + 1].x : m.x1) - it.x);
+    if (allGaps.length > 1) { const mx = Math.max(...allGaps.slice(0, -1)); allGaps[allGaps.length - 1] = Math.min(allGaps[allGaps.length - 1] * 0.85, mx * 2.2); }
+    const real = all.filter(it => !isFixed(it));
+    const gaps = all.map((it, i) => allGaps[i]).filter((g, i) => !isFixed(all[i]));
+    cap -= all.filter(isFixed).reduce((a, it) => a + rtk(it.rest), 0);
     if (!real.length || cap < real.length * 60) return false;
-    const gaps = real.map((it, i) => (i + 1 < real.length ? real[i + 1].x : m.x1) - it.x);
-    if (gaps.length > 1) { const mx = Math.max(...gaps.slice(0, -1)); gaps[gaps.length - 1] = Math.min(gaps[gaps.length - 1] * 0.85, mx * 2.2); }
     for (let i = 0; i < gaps.length; i++) gaps[i] = Math.max(1, gaps[i]);
     let best = null;
     for (const k of [1, 1.35, 1.7, 2.1]) {
@@ -350,89 +443,73 @@ const PdfImport = (() => {
     real.forEach((it, i) => { const [d, dot] = T2D[best.q[i]]; const tgt = it.b || it.rest; tgt.dur = d; tgt.dot = !!dot; tgt.trip = false; });
     return true;
   }
+  // 원칙: 원본에서 읽은 길이(기둥·빔·꼬리·점·확실한 쉼표)는 바꾸지 않는다.
+  // 박자 합이 안 맞으면 고치지 않고 "확인 필요" 표시와 이유만 남긴다.
+  // 바꾸는 경우는 (1) 리듬 정보가 아예 없는 마디(간격으로 추측), (2) 길이를 못 읽은 음,
+  // (3) 모양이 애매한 쉼표(4분/16분 후보) 중 박자 합에 맞는 쪽 고르기 뿐이고, 모두 이유를 기록한다.
+  const tickName = t => { const q = t / 480; return (Math.round(q * 100) / 100) + '박'; };
   function fitMeasure(m, cap, warnings, label) {
+    const why = m.why = [];
     let items = m.beats.map(b => ({ x: b.x, b }));
-    // 박이 있는 위치의 쉼표는 무시, 나머지 쉼표 추가
-    m.rests.forEach(r => { if (!m.beats.some(b => Math.abs(b.x - r.x) < 3)) items.push({ x: r.x, rest: r }); });
+    m.rests.forEach(r => {
+      if (!m.beats.some(b => Math.abs(b.x - r.x) < 3)) items.push({ x: r.x, rest: r });
+      else why.push('음표와 같은 자리에 있는 쉼표 1개는 다른 성부로 보고 뺐어요');
+    });
     items.sort((a, b) => a.x - b.x);
-    const sum = () => items.reduce((a, it) => a + (it.b ? tk(it.b) : TK[it.rest.dur] * (it.rest.dot ? 1.5 : 1)), 0);
+    const sum = () => items.reduce((a, it) => a + (it.b ? tk(it.b) : rtk(it.rest)), 0);
+    // 온쉼표 하나뿐인 마디 = 마디 전체를 쉼 (3/4 등에서도)
+    if (items.length === 1 && items[0].rest && items[0].rest.dur === 1 && !items[0].rest.dot && cap !== 1920 && T2D[cap]) {
+      const [d, dot] = T2D[cap]; items[0].rest.dur = d; items[0].rest.dot = !!dot;
+    }
     let s = sum();
-    // 길이를 모르는 박: 남은 길이를 나눠 가짐
     const unkB = m.beats.filter(b => !b.grace && !b.dur);
-    if (unkB.length && !m.beats.some(b => b.measured) && quantizeBySpacing(items, m, cap)) { m.guessed = true; m.spaced = true; s = sum(); }
-    else if (unkB.length) {
-      const known = s - items.filter(it => it.rest && !it.rest.known).reduce((a, it) => a + TK[it.rest.dur], 0);
-      const each = (cap - known) / unkB.length;
+    if (unkB.length && !m.beats.some(b => b.measured)) {
+      // 오선보 리듬 정보가 없음(타브만 있는 악보 등): 간격으로 추측
+      if (quantizeBySpacing(items, m, cap)) { m.spaced = true; why.push('오선보 리듬이 없어서 숫자 간격으로 길이를 추측했어요'); }
+      else { unkB.forEach(b => { b.dur = 8; b.guessDur = true; }); why.push('오선보 리듬이 없어서 길이를 8분음표로 임시로 넣었어요'); }
+      m.guessed = true; s = sum();
+    } else if (unkB.length) {
+      // 기둥을 못 찾은 음: 남은 길이를 똑같이 나눠서 딱 떨어질 때만 그 값, 아니면 8분 임시
+      const each = (cap - s) / unkB.length;
       let d = [1, 2, 4, 8, 16, 32].find(d => Math.abs(TK[d] - each) < 1), dot = false;
       if (!d) { d = [1, 2, 4, 8, 16, 32].find(d => Math.abs(TK[d] * 1.5 - each) < 1); dot = !!d; }
-      unkB.forEach(b => { b.dur = d || 8; b.dot = dot; });
-      if (!d) m.guessed = true;
-      s = sum();
+      unkB.forEach(b => { b.dur = d || 8; b.dot = dot; b.guessDur = true; });
+      why.push(`길이를 못 읽은 음 ${unkB.length}개는 ${d ? '남은 길이로 나눴어요' : '8분음표로 임시로 넣었어요'}`);
+      m.guessed = true; s = sum();
     }
-    // 모양을 모르는 쉼표는 남은 길이에 맞춰 조정
-    const unk = items.filter(it => it.rest && !it.rest.known);
-    if (s !== cap && unk.length) {
-      const rem = cap - (s - unk.reduce((a, it) => a + TK[it.rest.dur], 0));
-      if (rem > 0) {
-        const each = rem / unk.length;
-        const d = [1, 2, 4, 8, 16, 32].find(d => Math.abs(TK[d] - each) < 1) || [1, 2, 4, 8, 16, 32].find(d => TK[d] * 1.5 === each);
-        if (d) unk.forEach(it => { it.rest.dur = d; it.rest.dot = TK[d] !== each; });
-        s = sum();
-      }
-    }
-    // 음악 규칙으로 고치기: 한두 개 음의 길이를 바꿔서 박자 합이 딱 맞으면 채택
-    if (s !== cap && m.beats.length) {
-      const alts = b => {
-        const o = [];
-        if (b.grace) return o;
-        if (b.dur === 4) o.push({ dur: 2 }); if (b.dur === 2) o.push({ dur: 1 });
-        if (!b.dot) o.push({ dot: true }); else o.push({ dot: false });
-        if (b.dur >= 8) o.push({ dur: b.dur / 2 }), o.push({ dur: b.dur * 2 });
-        return o;
+    // 모양이 애매한 쉼표: 기록된 후보 길이 중에서만 고름 (다른 음 길이는 그대로)
+    const unc = items.filter(it => it.rest && it.rest.alt);
+    if (s !== cap && unc.length && unc.length <= 6) {
+      const opts = unc.map(it => [it.rest.dur, ...it.rest.alt]);
+      const base = s - unc.reduce((a, it) => a + rtk(it.rest), 0);
+      let best = null;
+      const rec = (i, acc, pick, changes) => {
+        if (i === unc.length) { if (acc === cap && (!best || changes < best.changes)) best = { pick: pick.slice(), changes }; return; }
+        opts[i].forEach((d, k) => { pick.push(d); rec(i + 1, acc + TK[d] * dotMul(unc[i].rest.dot), pick, changes + (k ? 1 : 0)); pick.pop(); });
       };
-      const bs = m.beats.filter(b => !b.grace);
-      const tryFix = (changes) => { const save = changes.map(([b]) => ({ b, dur: b.dur, dot: b.dot })); changes.forEach(([b, c]) => Object.assign(b, c)); if (sum() === cap) return true; save.forEach(v => { v.b.dur = v.dur; v.b.dot = v.dot; }); return false; };
-      let fixed = false;
-      outer: for (const b of bs) for (const c of alts(b)) if (tryFix([[b, c]])) { fixed = true; break outer; }
-      if (!fixed && bs.length <= 24) {
-        outer2: for (let i = 0; i < bs.length; i++) for (let j = i + 1; j < bs.length; j++) for (const c1 of alts(bs[i])) for (const c2 of alts(bs[j])) if (tryFix([[bs[i], c1], [bs[j], c2]])) { fixed = true; break outer2; }
+      rec(0, base, [], 0);
+      if (best && best.changes) {
+        unc.forEach((it, i) => { it.rest.dur = best.pick[i]; });
+        why.push('모양이 애매한 쉼표(4분/16분 등)의 길이를 박자 합에 맞는 쪽으로 골랐어요');
+        m.guessed = true; s = sum();
       }
-      if (fixed) m.guessed = true;
-      s = sum();
     }
-    // 그래도 넘치면: 간격 비율로 다시 계산 (넘치는 마디는 남기지 않음)
-    if (s > cap && quantizeBySpacing(items, m, cap)) { m.guessed = true; s = sum(); }
-    if (s < cap && m.beats.length) {
-      // 오선보가 없거나 쉼표를 못 찾음: 가장 넓은 빈 곳에 쉼표
-      const gaps = [];
-      for (let i = 0; i < items.length; i++) gaps.push({ i, g: (i + 1 < items.length ? items[i + 1].x : m.x1) - items[i].x });
-      gaps.sort((a, b) => b.g - a.g);
-      const avg = gaps.reduce((a, g) => a + g.g, 0) / gaps.length;
-      if (gaps[0] && gaps[0].g > avg * 1.4) {
-        const pos = gaps[0].i; const restDurs = splitTicks(cap - s);
-        const prev = items[pos];
-        // 앞 음이 있으면 붙임줄로 이어진 음(악보에서 타브 숫자 없이 이어지는 음), 없으면 쉼표
-        if (!prev.b) m.guessed = true;
-        restDurs.reverse().forEach((d, k) => items.splice(pos + 1, 0, prev.b ? { x: prev.x + 1 + k, b: { dur: d, dot: false, notes: prev.b.notes.map(n => ({ s: n.s, f: n.f, dead: n.dead, tieFill: true })), x: prev.x + 1 + k } } : { x: prev.x + 1 + k, rest: { dur: d, dot: false } }));
-      } else if (!m.beats.some(b => b.measured)) {
-        // 리듬 정보가 아예 없으면 균등 분배
-        m.guessed = true;
-      } else m.guessed = true;
-      s = sum();
-    }
-    if (s > cap && m.beats.length && quantizeBySpacing(items, m, cap)) { m.guessed = true; s = sum(); }
     m.items = items;
     m.sum = s;
-    if (s !== cap && m.beats.length) warnings.push(label);
+    if (s !== cap && m.beats.length) {
+      why.push(`박자 합이 ${s > cap ? '넘쳐요' : '모자라요'} (${tickName(s)} / ${tickName(cap)}). 원본에서 읽은 길이는 그대로 두었어요`);
+      warnings.push(label);
+    }
   }
 
   // ---------- 메인 ----------
-  async function importPdf(pdfjsLib, data, onProgress) {
+  async function importPdf(pdfjsLib, data, onProgress, opts) {
+    DBG = opts && opts.debug ? [] : null;
     const doc = await pdfjsLib.getDocument({ data, isEvalSupported: false }).promise;
     const sysList = []; const meta = { title: '', artist: '', bpm: 100, tuning: 'standard' };
     for (let p = 1; p <= doc.numPages; p++) {
       if (onProgress) onProgress(p, doc.numPages);
-      const page = await doc.getPage(p);
+      const page = await doc.getPage(p); CUR_PAGE = p;
       const { texts, shapes } = await readPage(pdfjsLib, page);
       const staves = findStaves(shapes);
       const tabs = staves.filter(s => s.type === 'tab');
@@ -461,7 +538,10 @@ const PdfImport = (() => {
       const seen = [];
       tabs.forEach(tab => {
         const std = staves.filter(s => s.type === 'std' && s.bottom > tab.top && s.bottom - tab.top < tab.sp * 20 && s.x0 < tab.x0 + 30 && s.x1 > tab.x1 - 30).sort((a, b) => a.bottom - b.bottom)[0];
-        const ms = parseSystem(tab, std, texts, shapes, {});
+        // 오선보 바로 위 다른 오선(보컬 등)의 아래줄 높이
+        const above = std && staves.filter(s => s !== std && s.type === 'std' && s.bottom > std.top + 1).sort((a, b) => a.bottom - b.bottom)[0];
+        const ms = parseSystem(tab, std, texts, shapes, { ceil: above ? above.bottom : null });
+        ms.forEach(m => { m.page = p; m.sysTop = std ? std.top : tab.top; m.sysBot = tab.bottom; });
         // 섹션 이름
         const secs = texts.filter(t => /^(intro|verse|chorus|bridge|solo|outro|pre-?chorus|interlude|break|ending|riff\s*\w*|[A-Z])$/i.test(t.str) && t.y > (std ? std.top : tab.top) + tab.sp * 2 && t.y < (std ? std.top : tab.top) + tab.sp * 9);
         secs.forEach(t => {
@@ -479,7 +559,7 @@ const PdfImport = (() => {
     const allM = []; sysList.forEach(s => s.measures.forEach(m => allM.push(m)));
     if (!allM.length) throw new Error('NO_TAB');
     // 박자표 결정
-    const rawSum = m => m.beats.reduce((a, b) => a + tk(b), 0) + m.rests.filter(r => !m.beats.some(b => Math.abs(b.x - r.x) < 3)).reduce((a, r) => a + TK[r.dur] * (r.dot ? 1.5 : 1), 0);
+    const rawSum = m => m.beats.reduce((a, b) => a + tk(b), 0) + m.rests.filter(r => !m.beats.some(b => Math.abs(b.x - r.x) < 3)).reduce((a, r) => a + rtk(r), 0);
     let ts = null;
     const firstMark = allM.find(m => Array.isArray(m.tsMark));
     const sums = allM.map(rawSum).filter(x => x > 0 && x % 240 === 0);
@@ -488,7 +568,7 @@ const PdfImport = (() => {
     ts = firstMark ? firstMark.tsMark : (modeSum % 480 === 0 ? [modeSum / 480, 4] : [modeSum / 240, 8]);
     song.ts = ts;
     const warnings = [];
-    let curTs = ts;
+    let curTs = ts, prevNotes = null;
     song.measures = [];
     allM.forEach((m, i) => {
       if (Array.isArray(m.tsMark)) curTs = m.tsMark;
@@ -504,24 +584,35 @@ const PdfImport = (() => {
       let pickup = null;
       if (i === 0 && allM.length > 1) { const r = rawSum(m); if (r > 0 && r < cap && r % 240 === 0 && !m.rests.length) { pickup = r % 480 === 0 ? [r / 480, 4] : [r / 240, 8]; cap = r; } }
       fitMeasure(m, cap, warnings, i + 1);
+      if (DBG) DBG.push({ measure: i + 1, page: m.page, x0: m.x0, x1: m.x1, top: m.sysTop, bottom: m.sysBot, why: m.why });
       const nm = newMeasure();
       const prevTs = i === 0 ? null : (song.measures[i - 1] && measureTs(song, i - 1));
       if (i === 0) { song.ts = curTs; if (pickup) nm.ts = pickup; }
       else if (!prevTs || prevTs[0] !== curTs[0] || prevTs[1] !== curTs[1]) nm.ts = curTs.slice();
-      if (m.guessed || warnings.includes(i + 1)) nm.check = true;
+      if (m.guessed || warnings.includes(i + 1)) { nm.check = true; if (m.why.length) nm.checkWhy = m.why.slice(); }
       if (m.section) nm.section = m.section;
       m.items.forEach(it => {
-        if (it.rest) { const b = newBeat(it.rest.dur); b.dot = !!it.rest.dot; nm.beats.push(b); return; }
-        const src = it.b; const b = newBeat(src.dur || 8); b.dot = !!src.dot; b.trip = !!src.trip; if (src.grace) b.grace = true;
+        // dm = 원본에서 읽은 길이 → 편집기의 자동 리듬 맞춤이 몰래 바꾸지 않음
+        if (it.rest) { const b = newBeat(it.rest.dur); b.dot = it.rest.dot === 2 ? 2 : !!it.rest.dot; if (!m.spaced) b.dm = true; nm.beats.push(b); return; }
+        const src = it.b; const b = newBeat(src.dur || 8); b.dot = src.dot === 2 ? 2 : !!src.dot; b.trip = !!src.trip; if (src.grace) b.grace = true;
+        if (!src.grace && src.measured && !src.guessDur && !m.spaced) b.dm = true;
+        if (src.tieFromPrev) {
+          // 오선보에서 찾은 이어진 음: 바로 앞 음을 붙임줄로 이어감
+          if (prevNotes) prevNotes.forEach(p => { const nn = newNote(p.s, p.f); nn.tie = true; if (p.dead) nn.dead = true; b.notes.push(nn); });
+          else m.why.push('앞 음이 없는 이어진 음은 쉼표로 두었어요');
+          if (b.notes.length) prevNotes = b.notes;
+          nm.beats.push(b); return;
+        }
         src.notes.forEach(n => {
           const nn = newNote(n.s, n.f);
           if (n.dead) nn.dead = true; if (n.harm) nn.harm = true;
           if (n.slide) nn.slide = n.slide; if (n.hp) nn.hp = true; if (n.bend) nn.bend = { a: n.bend.a, ...(n.bend.r ? { r: true } : {}) };
           if (n.pm) nn.pm = true; if (n.lr) nn.lr = true;
           if (n.paren) nn._paren = true;
-          if (n.tieFill) nn.tie = true;
+          if (src.stac) nn.stac = true;
           b.notes.push(nn);
         });
+        if (b.notes.length && !b.grace) prevNotes = b.notes;
         nm.beats.push(b);
       });
       song.measures.push(nm);
@@ -532,10 +623,11 @@ const PdfImport = (() => {
       const p = prevOnString(song, mi, bi, n.s);
       if (p && p.note.f === n.f) n.tie = true; else n.ghost = true;
     })));
-    return { song, warnings, systems: sysList.length, pages: doc.numPages, noStd: sysList.filter(s => !s.hasStd).length };
+    return { song, warnings, systems: sysList.length, pages: doc.numPages, noStd: sysList.filter(s => !s.hasStd).length, debug: DBG || undefined };
   }
 
-  return { importPdf };
+  // _test: 자동 테스트용 내부 함수 (앱에서는 쓰지 않음)
+  return { importPdf, _test: { readPage, findStaves, parseSystem, readRhythm, fitMeasure, quantizeBySpacing } };
 })();
 
 if (typeof module !== 'undefined') module.exports = PdfImport;

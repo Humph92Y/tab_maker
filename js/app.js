@@ -295,11 +295,14 @@ function diagHtml(mi) {
   const unit = 1920 / ts[1], bn = v => Math.round(v / unit * 100) / 100;
   const unitName = { 2: '2분음표', 4: '4분음표', 8: '8분음표', 16: '16분음표' }[ts[1]] || '박';
   let h = `<div class="diag ${prob}">`;
+  // PDF에서 불러올 때 남긴 이유 (원본에서 읽은 길이는 바꾸지 않고, 왜 확인이 필요한지만 적어 둠)
+  const why = m.check && Array.isArray(m.checkWhy) && m.checkWhy.length ? `<div class="dx muted">📄 PDF에서 읽을 때: ${m.checkWhy.map(esc).join(' · ')}</div>` : '';
   if (prob === 'over' || prob === 'under') {
     popCands = rhythmCandidates(song, mi);
     const best = popCands.find(c => keepsManual(m, c)) || popCands[0];
     h += `<div class="dt">⚠ ${prob === 'over' ? '박자가 넘쳐요' : '박자가 모자라요'}</div>`;
     h += `<div class="dx">이 마디는 <b>${ts[0]}/${ts[1]}박자</b>라서 ${unitName} <b>${ts[0]}개</b> 길이만큼 들어가요. 그런데 지금 음표 길이를 다 더하면 <b>${bn(fill)}개</b> 길이라서 <b>${bn(Math.abs(fill - cap))}개</b>만큼 ${prob === 'over' ? '넘쳐요' : '모자라요'}.</div>`;
+    h += why;
     h += `<div class="dx muted">${prob === 'over' ? '흔한 원인: 음표 길이(♪, ♩)가 실제보다 길게 들어갔거나, 다음 마디의 숫자가 이 마디에 같이 들어왔어요.' : '흔한 원인: 음표가 실제보다 짧게 들어갔거나, 쉼표가 빠졌어요. 노래 첫 마디(못갖춘마디)라면 원래 짧을 수도 있어요.'}</div>`;
     h += `<div class="fixes">`;
     if (best) h += `<div class="fix"><button data-act="fix:fit" class="primary">🔧 해결: 리듬 자동 맞춤</button> <span class="cicons">${ticksIcons(m, best.ticks)}</span> <span class="muted">(${esc(best.label)})</span></div>`;
@@ -314,6 +317,7 @@ function diagHtml(mi) {
     if (popCands.length > 1) h += `<div class="dx muted">다른 리듬을 원하면 아래 후보에서 골라도 돼요.</div>` + candHtml();
   } else if (prob === 'check') {
     h += `<div class="dt">🔍 PDF에서 자동으로 읽은 마디예요</div><div class="dx">박자 합은 맞췄지만, 일부 음표 길이는 추측했어요. ▶로 들어보고 원본과 비교한 뒤 괜찮으면 확인을 눌러 주세요.</div>`;
+    h += why;
     h += `<div class="fixes"><div class="fix"><button data-act="fix:checked" class="primary">✓ 확인 완료</button> ${btn('▶ 이 마디 듣기', 'loopm')}</div></div>` + candHtml();
   }
   return h + `</div>`;
@@ -968,7 +972,7 @@ $('pdfInput').onchange = async e => {
     changed(true);
     const chk = song.measures.filter(m => m.check).length;
     status(`"${song.title}" 악보를 불러왔어요: ${song.measures.length}마디. ${chk ? `⚠ 표시된 ${chk}마디는 원본과 한 번 비교해 주세요.` : '모든 마디의 박자가 맞아요.'}`);
-    alert(`✅ PDF 인식 완료\n\n제목: ${song.title}\n마디: ${song.measures.length}개\n빠르기: ${song.bpm} BPM\n\n${chk ? `⚠ 주황색 마디 번호(${chk}개)는 리듬을 추측해서 맞춘 곳이에요.\n원본과 비교해서 필요하면 고쳐 주세요.` : '모든 마디의 박자가 맞아요.'}\n\n(되돌리려면 Ctrl+Z)`);
+    alert(`✅ PDF 인식 완료\n\n제목: ${song.title}\n마디: ${song.measures.length}개\n빠르기: ${song.bpm} BPM\n\n${chk ? `⚠ 주황색 마디 번호(${chk}개)는 박자 합이 안 맞거나 일부 길이를 추측한 곳이에요.\n원본에서 읽은 길이는 그대로 두었으니, 원본과 비교해서 필요하면 고쳐 주세요.` : '모든 마디의 박자가 맞아요.'}\n\n(되돌리려면 Ctrl+Z)`);
   } catch (err) {
     console.error(err);
     const msg = err && err.message === 'NO_TAB' ? '이 PDF에서 타브(6줄) 악보를 찾지 못했어요.\n스캔하거나 사진으로 찍은 PDF는 아직 인식할 수 없어요.\n(Guitar Pro, MuseScore 등에서 내보낸 PDF는 인식돼요)' : '이 PDF를 읽지 못했어요. (' + (err && err.message) + ')';
