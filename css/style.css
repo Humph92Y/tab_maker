@@ -313,3 +313,8 @@ body.popopen #page { margin-bottom: 48vh; }
 .patb small { font-size: 10px; color: #667; }
 .linkhint { font-size: 12.5px; }
 @media (max-width: 700px) { .popup { left: 0 !important; transform: none; width: 100%; max-height: 52vh; } body.popopen #page { margin-bottom: 56vh; } .popup button.patb { min-width: 52px; } }
+.theory .calc { background: #fffbe8; border: 1px solid #eedc9a; border-radius: 10px; padding: 8px 14px 10px; margin: 6px 0 14px; }
+.theory .calc h3 { font-size: 16px; margin-top: 4px; }
+.calcgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 6px 22px; }
+.theory .calct td:first-child { font-size: 13px; }
+.calct tr.sum td { font-weight: 700; background: #eef7ee; }
