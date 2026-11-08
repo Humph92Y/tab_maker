@@ -1021,6 +1021,11 @@ function tick() {
 }
 $('bPlay').onclick = togglePlay;
 $('speed').oninput = () => { $('speedVal').textContent = $('speed').value + '%'; };
+// 음량 (앱 안 소리 크기, 이 기기에 기억)
+function setVol(v, save) { v = Math.max(0, Math.min(150, Math.round(+v || 0))); $('vol').value = v; $('volVal').textContent = v + '%'; Player.setVolume(v / 100); if (save) try { localStorage.setItem('gtab-vol', String(v)); } catch (e) { } }
+$('vol').oninput = () => setVol($('vol').value, true);
+$('vol').onchange = () => { if (!Player.isPlaying()) toneDemo(); };
+(function () { let v = null; try { v = localStorage.getItem('gtab-vol'); } catch (e) { } if (v !== null && v !== '' && isFinite(+v)) setVol(+v, false); })();
 
 window.addEventListener('resize', () => { clearTimeout(window._rz); window._rz = setTimeout(render, 120); });
 

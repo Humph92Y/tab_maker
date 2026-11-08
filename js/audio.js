@@ -11,18 +11,25 @@ const Player = (() => {
   let onStop = null;
 
   // 톤 프리셋: 앰프에 넣는 게인(pre), 찌그러짐 정도(k), 미드 강조, 캐비닛 고음 컷, 최종 볼륨(post)
+  // 톤: 톤마다 '찌그러짐 정도'와 '음색(EQ)'을 확실히 다르게
+  //  clean      : 찌그러짐 없음, 맑고 반짝이는 고음
+  //  crunch     : 진공관 앰프를 살짝 세게 친 느낌 (치는 세기에 따라 거칠어짐)
+  //  overdrive  : 저음을 먼저 깎고 찌그러뜨려 가운데 음(미드)이 툭 튀어나옴, 길게 끌림
+  //  distortion : 두 번 찌그러뜨려 꽉 찬 소리, 가운데를 파내고(스쿱) 저음·고음 강조 (메탈 느낌)
+  // eq: [종류, 주파수, 증폭(dB), Q]  post: 톤끼리 크기가 비슷하게 들리도록 맞춘 출력
   const TONE_PRESETS = {
-    clean: { pre: 1, k: 0, hp: 60, mid: [800, 1, 0.8], cab: 6500, post: 0.9 },
-    crunch: { pre: 5, k: 7, hp: 90, mid: [750, 3, 0.8], cab: 5000, post: 0.42 },
-    overdrive: { pre: 12, k: 20, hp: 170, mid: [900, 6, 0.9], cab: 4400, post: 0.24 },
-    distortion: { pre: 28, k: 60, hp: 110, mid: [800, 4, 0.8], cab: 4200, post: 0.16 },
-    acoustic: { acoustic: true, post: 0.95 },
+    clean: { hp: 70, stages: [], eq: [['lowshelf', 150, 2], ['peaking', 900, -2, 0.8], ['peaking', 3000, 4, 0.9], ['highshelf', 6000, 5]], cab: 11000, post: 2.4 },
+    crunch: { hp: 90, stages: [{ pre: 7, k: 3, bias: 0.15 }], eq: [['peaking', 650, 3, 0.8], ['peaking', 2500, 4, 1]], cab: 5800, post: 0.3 },
+    overdrive: { hp: 90, preHp: 420, stages: [{ pre: 30, k: 3, bias: 0.05 }], eq: [['peaking', 720, 9, 0.9], ['lowshelf', 200, 3], ['highshelf', 4000, -5]], cab: 3800, post: 0.2 },
+    distortion: { hp: 100, preHp: 160, stages: [{ pre: 120, k: 6, bias: 0 }, { pre: 6, k: 4, bias: 0 }], eq: [['lowshelf', 120, 8], ['peaking', 750, -9, 0.7], ['peaking', 3000, 4, 1.1]], cab: 5000, post: 0.26 },
+    acoustic: { acoustic: true, post: 2.0 },
   };
+  let volume = 0.8; // 전체 음량 0~1.5 (앱 안의 🔊 조절)
 
   function init() {
     if (ctx) return;
     ctx = new (window.AudioContext || window.webkitAudioContext)();
-    master = ctx.createGain(); master.gain.value = 0.9;
+    master = ctx.createGain(); master.gain.value = volume;
     const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 4;
     master.connect(comp); comp.connect(ctx.destination);
     // 리버브(공간감)
@@ -54,16 +61,20 @@ const Player = (() => {
     }
     const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = p.hp;
     let last = hp;
-    if (p.k > 0) {
-      const pre = ctx.createGain(); pre.gain.value = p.pre;
-      const shaper = ctx.createWaveShaper(); shaper.curve = distCurve(p.k); shaper.oversample = '4x';
-      hp.connect(pre); pre.connect(shaper); last = shaper;
-    }
-    const mid = ctx.createBiquadFilter(); mid.type = 'peaking'; mid.frequency.value = p.mid[0]; mid.gain.value = p.mid[1]; mid.Q.value = p.mid[2];
-    const cab = ctx.createBiquadFilter(); cab.type = 'lowpass'; cab.frequency.value = p.cab; cab.Q.value = p.k > 0 ? 0.9 : 0.7;
-    last.connect(mid); mid.connect(cab);
-    if (p.k > 0) { const cab2 = ctx.createBiquadFilter(); cab2.type = 'lowpass'; cab2.frequency.value = p.cab * 1.4; cab.connect(cab2); cab2.connect(out); }
-    else cab.connect(out);
+    const link = n => { last.connect(n); last = n; };
+    // 찌그러뜨리기 전에 저음 깎기 (오버드라이브 페달처럼 소리가 뭉개지지 않게)
+    if (p.preHp) { const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = p.preHp; f.Q.value = 0.7; link(f); }
+    p.stages.forEach(st => {
+      const pre = ctx.createGain(); pre.gain.value = st.pre; link(pre);
+      const sh = ctx.createWaveShaper(); sh.curve = distCurve(st.k, st.bias); sh.oversample = '4x'; link(sh);
+      // 단 사이 고음 정리 (찌그러짐의 쇳소리 줄이기)
+      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 7000; link(lp);
+    });
+    p.eq.forEach(([type, f, g, q]) => { const e = ctx.createBiquadFilter(); e.type = type; e.frequency.value = f; e.gain.value = g; if (q) e.Q.value = q; link(e); });
+    // 스피커(캐비닛): 찌그러진 톤은 두 번 깎아서 실제 앰프 스피커처럼
+    const cab = ctx.createBiquadFilter(); cab.type = 'lowpass'; cab.frequency.value = p.cab; cab.Q.value = p.stages.length ? 1.0 : 0.7; link(cab);
+    if (p.stages.length) { const cab2 = ctx.createBiquadFilter(); cab2.type = 'lowpass'; cab2.frequency.value = p.cab * 1.3; link(cab2); }
+    last.connect(out);
     return { in: hp };
   }
 
@@ -89,9 +100,10 @@ const Player = (() => {
     delayRet.gain.setTargetAtTime(fx.del ? fx.delAmt / 100 * 0.7 : 0, now, 0.03);
   }
 
-  function distCurve(k) {
-    const n = 2048, c = new Float32Array(n);
-    for (let i = 0; i < n; i++) { const x = i * 2 / n - 1; c[i] = (1 + k) * x / (1 + k * Math.abs(x)) * 0.9 + (x > 0 ? 0.02 : 0); }
+  // 찌그러짐 곡선: tanh 모양(부드럽게 눌림). bias 가 있으면 위아래가 달라져 진공관처럼 짝수 배음이 생김
+  function distCurve(k, bias) {
+    const n = 4096, c = new Float32Array(n), b = bias || 0, off = Math.tanh(k * b);
+    for (let i = 0; i < n; i++) { const x = i * 2 / n - 1; c[i] = (Math.tanh(k * (x + b)) - off) / Math.tanh(k); }
     return c;
   }
   function makeImpulse(sec) {
@@ -304,5 +316,8 @@ const Player = (() => {
     voice({ t0: t, t1: t + 0.9, midi, events: [], vel: 0.5, startSemi: 0 });
   }
 
-  return { play, stop, currentBeat, preview, setFx: (fx, bpm) => { if (ctx) setFx(fx, bpm); }, setTone: t => { if (ctx) setTone(t); }, isPlaying: () => playing };
+  return { play, stop, currentBeat, preview, setFx: (fx, bpm) => { if (ctx) setFx(fx, bpm); }, setTone: t => { if (ctx) setTone(t); }, isPlaying: () => playing,
+    // 음량 0~1.5 (1 = 기본보다 조금 큼)
+    setVolume: v => { volume = Math.max(0, Math.min(1.5, v)); if (ctx) master.gain.setTargetAtTime(volume, ctx.currentTime, 0.02); }, getVolume: () => volume,
+    _presets: TONE_PRESETS };
 })();
