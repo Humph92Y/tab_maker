@@ -12,6 +12,49 @@ const PdfImport = (() => {
   const SMUFL_DOT = 0xE1E7;
   const SMUFL_STAC_A = 0xE4A2, SMUFL_STAC_B = 0xE4A3;
   let DBG = null, CUR_PAGE = 0; // 디버그: 쉼표 후보와 판단 이유 기록
+  // ---------- 출처별 규칙 (source profiles) ----------
+  // 특정 프로그램이 그린 PDF에만 맞춘 규칙은 여기서 켜고 끔 → 다른 악보에는 적용되지 않음.
+  //  새 규칙이 한 출처에서만 검증됐으면 그 출처의 프로필에만 켜고, 회귀 테스트(tools/regress.js)로
+  //  다른 출처에서도 나빠지지 않는 것을 확인한 뒤에만 generic 으로 옮김.
+  //   vectorTimeSig : 박자표 숫자를 도형(구멍·획) 모양으로 읽기 (Guitar Pro 숫자 모양으로 검증)
+  //   tabSlashes    : 타브 안의 빗금(/)으로 박 만들기·개수 확인
+  //   tempoGlyph    : "=" 왼쪽 도형 음표의 꼬리 모양으로 템포 기준 음표 읽기
+  //   gappyTabLines : 숫자가 촘촘해 끊겨 보이는 타브 줄 인정
+  const PROFILES = {
+    generic: { name: 'generic', label: '일반', vectorTimeSig: false, tabSlashes: false, tempoGlyph: false, gappyTabLines: false },
+    guitarpro: { name: 'guitarpro', label: 'Guitar Pro', vectorTimeSig: true, tabSlashes: true, tempoGlyph: true, gappyTabLines: true },
+    musescore: { name: 'musescore', label: 'MuseScore', vectorTimeSig: false, tabSlashes: false, tempoGlyph: false, gappyTabLines: false },
+    akbonara: { name: 'akbonara', label: '악보나라', vectorTimeSig: false, tabSlashes: false, tempoGlyph: false, gappyTabLines: false },
+  };
+  let PROF = PROFILES.generic;
+  // PDF 정보(Creator/Producer)로 출처 추정. 확실하지 않으면 generic (출처 전용 규칙 끔)
+  function detectSource(info) {
+    const s = info ? [info.Creator, info.Producer, info.Title].filter(Boolean).join(' ') : '';
+    if (/guitar\s*pro/i.test(s)) return 'guitarpro';
+    if (/musescore/i.test(s)) return 'musescore';
+    if (/akbonara|악보나라/i.test(s)) return 'akbonara';
+    return 'generic';
+  }
+  function setProfile(name) { PROF = PROFILES[name] || PROFILES.generic; return PROF.name; }
+
+  // ---------- 기호 분류기 연결점 (나중에 학습된 분류기를 끼울 자리) ----------
+  // 지금은 규칙 기반 판단만 씀. registerClassifier(kind, fn) 로 분류기를 등록하면
+  //  fn(features) → { label, confidence } 를 받아, 확신도가 기준 이상일 때만 규칙 판단을 대신함.
+  //  등록된 분류기가 없으면 동작은 그대로 (앱은 스스로 학습하지 않음)
+  const CLASSIFIERS = {};
+  function registerClassifier(kind, fn, minConfidence) { if (fn) CLASSIFIERS[kind] = { fn, min: minConfidence == null ? 0.9 : minConfidence }; else delete CLASSIFIERS[kind]; }
+  function classify(kind, features, ruleLabel) {
+    const c = CLASSIFIERS[kind]; if (!c) return ruleLabel;
+    let r = null; try { r = c.fn(features); } catch (e) { r = null; }
+    if (!r || r.confidence < c.min || r.label === ruleLabel) return ruleLabel;
+    if (DBG) DBG.push({ page: CUR_PAGE, method: 'classifier-' + kind, rule: ruleLabel, label: r.label, confidence: r.confidence });
+    return r.label;
+  }
+  // 도형 특징 (오선 간격 sp 로 나눈 크기 등): 분류기 입력이자, 사용자 수정 기록의 학습 자료 형식
+  function symbolFeatures(s, sp) {
+    const rs = restShape(s, sp);
+    return { w: +(s.w / sp).toFixed(3), h: +(s.h / sp).toFixed(3), n: s.n, curve: !!s.curve, fill: +fillRatio(s).toFixed(3), hooks: rs.hooks, flagTop: !!rs.flag };
+  }
   const SMUFL_TS = { 0xE080: 0, 0xE081: 1, 0xE082: 2, 0xE083: 3, 0xE084: 4, 0xE085: 5, 0xE086: 6, 0xE087: 7, 0xE088: 8, 0xE089: 9 };
 
   const mul = (m, n) => [m[0] * n[0] + m[2] * n[1], m[1] * n[0] + m[3] * n[1], m[0] * n[2] + m[2] * n[3], m[1] * n[2] + m[3] * n[3], m[0] * n[4] + m[2] * n[5] + m[4], m[1] * n[4] + m[3] * n[5] + m[5]];
@@ -94,7 +137,7 @@ const PdfImport = (() => {
     // 숫자가 촘촘한 타브 줄은 숫자 뒤가 비어 있어 칠해진 비율이 낮음 → 양 끝이 다른 온전한 줄과 딱 맞으면 줄로 인정
     //  (덧줄은 시스템 왼쪽 끝(음자리표 자리)에서 시작하지 않으므로 섞이지 않음)
     const gappy = rows.filter(r => !full.includes(r) && r.x1 - r.x0 > 200 && r.len > (r.x1 - r.x0) * 0.08 && full.some(f => Math.abs(f.x0 - r.x0) < 1.5 && Math.abs(f.x1 - r.x1) < 1.5 && Math.abs(f.y - r.y) < 60));
-    const long = full.concat(gappy).sort((a, b) => b.y - a.y); // 위→아래
+    const long = full.concat(PROF.gappyTabLines ? gappy : []).sort((a, b) => b.y - a.y); // 위→아래
     const staves = []; const used = new Set();
     for (let i = 0; i < long.length; i++) {
       if (used.has(i)) continue;
@@ -185,7 +228,7 @@ const PdfImport = (() => {
     else if (stdStaff && ctx) ctx.rhythmSource = 'other-staff';
     // 타브 안의 리듬 빗금(/) 개수: 오선보에서 찾은 빗금과 맞는지 확인용.
     //  오선보 리듬이 없으면 빗금 자리에 박을 만들고 길이는 간격으로 추측(확인 표시)
-    const tsl = slashHeads(shapes, s => s.cy < tab.top - sp * 0.5 && s.cy > tab.bottom + sp * 0.5 && s.cx > tab.x0 && s.cx < tab.x1, sp * 0.75);
+    const tsl = !PROF.tabSlashes ? [] : slashHeads(shapes, s => s.cy < tab.top - sp * 0.5 && s.cy > tab.bottom + sp * 0.5 && s.cx > tab.x0 && s.cx < tab.x1, sp * 0.75);
     measures.forEach(m => {
       const xs = tsl.filter(s => s.cx > m.x0 + 1 && s.cx < m.x1 - 1);
       if (!xs.length && !m.beats.some(b => b.slash)) return;
@@ -392,7 +435,7 @@ const PdfImport = (() => {
     measures.forEach(m => {
       tsFromGlyphs(m, tsg);
       // 그림으로 된 박자표(Guitar Pro 등): 숫자 모양의 구멍 개수로 후보를 만들고, 마디 내용 길이로 최종 결정(importPdf)
-      if (!m.tsMark) { const v = vecTimeSig(m, st, shapes, sp); if (v) { m.tsCand = v.cands; m.tsMark = 'vector'; v.shapes.forEach(s => tsShapes.add(s)); log({ x: v.x, y: st.top, method: 'timesig-vector', ok: true, digits: v.digits, cands: v.cands }); } }
+      if (!m.tsMark && PROF.vectorTimeSig) { const v = vecTimeSig(m, st, shapes, sp); if (v) { m.tsCand = v.cands; m.tsMark = 'vector'; v.shapes.forEach(s => tsShapes.add(s)); log({ x: v.x, y: st.top, method: 'timesig-vector', ok: true, digits: v.digits, cands: v.cands }); } }
       if (!m.tsMark) {
         const big = shapes.filter(s => s.kind === 'F' && s.curve && s.cx > m.x0 && s.cx < m.x1 && s.h > sp * 1.6 && s.h < sp * 2.6 && s.w > sp * 1.3 && s.y0 >= st.bottom - 1 && s.y1 <= st.top + 1 && (!m.beats.length || s.cx < m.beats[0].x - sp));
         for (const a of big) for (const b of big) if (a !== b && Math.abs(a.x0 - b.x0) < 1.5 && a.cy > b.cy + sp * 1.5) m.tsMark = 'unknown';
@@ -562,6 +605,14 @@ const PdfImport = (() => {
           if (rs.flag && rs.hooks >= 1 && rs.hooks <= 3) dur = 4 * Math.pow(2, rs.hooks);
           else if (!rs.flag && rs.hooks >= 1 && hr > 2.2 && hr < 3.8) dur = 4; // 4분쉼표: 위는 사선, 아래에 갈고리
           else { dur = hr <= 2.2 ? 8 : hr <= 3.4 ? 4 : 32; alt = hr <= 2.2 ? null : [16]; } // 모양이 애매할 때만 높이로 (후보 기록)
+          // 분류기 연결점: 등록된 분류기가 확신할 때만 규칙 판단(쉼표 여부·종류)을 바꿈
+          if (inStaff && why !== 'timesig' && why !== 'clef') {
+            const rule = why ? 'none' : 'rest' + dur, lab = classify('rest', symbolFeatures(s, sp), rule);
+            if (lab !== rule) {
+              if (lab === 'none') why = 'classifier';
+              else if (/^rest\d+$/.test(lab)) { why = null; dur = +lab.slice(4); alt = null; }
+            }
+          }
           if (!why) {
             const nd = dotsAfter(s.x1 + sp * 0.1, s.x1 + sp * 1.8, st.bottom - sp, st.top + sp, () => false);
             const r = { x: s.cx, y: s.cy, dur, dot: nd.n === 2 ? 2 : nd.n === 1, known: !alt, alt, method: 'vector-curve' };
@@ -656,23 +707,25 @@ const PdfImport = (() => {
       const x = left ? s.x0 : s.x1, P = s.pts.filter(p => Math.abs(p[0] - x) < s.w * 0.25), lo = Math.min(...P.map(p => p[1])), hi = Math.max(...P.map(p => p[1]));
       return vs.some(v => Math.abs(v.cx - x) < 1 && ((v.y0 > lo - 1 && v.y0 < hi + 1) || (v.y1 > lo - 1 && v.y1 < hi + 1)));
     };
-    const c = shapes.filter(s => isSl(s) && zone(s) && !(stemAt(s, true) && stemAt(s, false)));
+    const c = shapes.filter(s => zone(s) && classify('slash', symbolFeatures(s, sp), isSl(s) && !(stemAt(s, true) && stemAt(s, false)) ? 'slash' : 'none') === 'slash');
     const inner = new Set(c.filter(s => c.some(o => o !== s && o.x0 <= s.x0 + 0.1 && o.x1 >= s.x1 - 0.1 && o.y0 <= s.y0 + 0.1 && o.y1 >= s.y1 - 0.1 && o.w * o.h > s.w * s.h * 1.05)));
     return c.filter(s => !inner.has(s)).map(s => ({ x0: s.x0, x1: s.x1, y0: s.y0, y1: s.y1, cx: s.cx, cy: s.cy, hollow: [...inner].some(o => o.x0 >= s.x0 - 0.1 && o.x1 <= s.x1 + 0.1 && o.y0 >= s.y0 - 0.1 && o.y1 <= s.y1 + 0.1) }));
   }
   // 템포 기호의 기준 음표: "=" 왼쪽의 음표 도형. 꼬리가 있으면 8분, 빈 머리면 2분, 오른쪽에 점이 있으면 점음표
   //  꼬리 판단: 도형 위쪽 1/3 높이에서 기둥보다 넓게 칠해진 부분이 있는지 (4분음표는 기둥만)
+  // 글자(SMuFL) 음표 기호로 된 템포 기준 음표 (글꼴 번호로 정해져 있어 출처와 관계없이 씀)
+  function tempoUnitSmufl(texts, eq) {
+    const res = { unit: 4, dot: false };
+    const g = texts.find(t => t.str.length === 1 && Math.abs(t.y - eq.y) < 3 && t.x < eq.x && t.x > eq.x - 30 && /[\uE1D2-\uE1D9\u2669\u266A]/.test(t.str));
+    if (g) { const c = g.str.charCodeAt(0); res.unit = c === 0xE1D3 || c === 0xE1D2 ? 2 : c === 0xE1D7 || c === 0xE1D8 || c === 0x266A ? 8 : 4; res.dot = texts.some(t => t.str.charCodeAt(0) === 0xE1E7 && t.x > g.x && t.x < eq.x); }
+    return res;
+  }
   function tempoUnit(shapes, texts, eq) {
     const y0 = eq.y - eq.h * 0.6, y1 = eq.y + eq.h * 1.6;
     const near = shapes.filter(s => s.kind === 'F' && s.x1 <= eq.x + 0.5 && s.x0 > eq.x - eq.h * 2.2 && s.y0 > y0 && s.y1 < y1);
     const glyph = near.filter(s => s.h > eq.h * 0.6).sort((a, b) => b.x1 - a.x1)[0];
+    if (!glyph) return tempoUnitSmufl(texts, eq);
     const res = { unit: 4, dot: false };
-    if (!glyph) {
-      // 글자(SMuFL) 음표 기호
-      const g = texts.find(t => t.str.length === 1 && Math.abs(t.y - eq.y) < 3 && t.x < eq.x && t.x > eq.x - 30 && /[\uE1D2-\uE1D9\u2669\u266A]/.test(t.str));
-      if (g) { const c = g.str.charCodeAt(0); res.unit = c === 0xE1D3 || c === 0xE1D2 ? 2 : c === 0xE1D7 || c === 0xE1D8 || c === 0x266A ? 8 : 4; res.dot = texts.some(t => t.str.charCodeAt(0) === 0xE1E7 && t.x > g.x && t.x < eq.x); }
-      return res;
-    }
     const P = glyph.poly || glyph.pts, N = 30, M = 30;
     const at = (i, j) => inPoly(P, glyph.x0 + (i + 0.5) * glyph.w / N, glyph.y0 + (j + 0.5) * glyph.h / M);
     // 기둥 = 세로로 가장 길게 칠해진 열. 꼬리 = 머리보다 위(높이 35~90%)에서 기둥 오른쪽에 칠해진 부분
@@ -928,6 +981,8 @@ const PdfImport = (() => {
   async function importPdf(pdfjsLib, data, onProgress, opts) {
     DBG = opts && opts.debug ? [] : null;
     const doc = await pdfjsLib.getDocument({ data, isEvalSupported: false }).promise;
+    let info = null; try { info = (await doc.getMetadata()).info; } catch (e) { info = null; }
+    setProfile(opts && opts.profile || detectSource(info));
     let imgPages = 0;
     const sysList = []; const meta = { title: '', artist: '', bpm: 100, tuning: 'standard' };
     for (let p = 1; p <= doc.numPages; p++) {
@@ -955,7 +1010,7 @@ const PdfImport = (() => {
           const val = m1 ? +m1[1] : nx ? +nx.str : null;
           if (val) {
             // "=" 왼쪽의 음표 기호로 기준 음표(4분/8분/점4분) 판단 → 앱의 빠르기는 4분음표 기준으로 바꿈
-            const u = tempoUnit(shapes, texts, eq);
+            const u = PROF.tempoGlyph ? tempoUnit(shapes, texts, eq) : tempoUnitSmufl(texts, eq);
             meta.tempo = { unit: u.unit, dot: u.dot, value: val };
             meta.bpm = Math.round(val * (4 / u.unit) * (u.dot ? 1.5 : 1));
           }
@@ -1083,11 +1138,11 @@ const PdfImport = (() => {
       const p = prevOnString(song, mi, bi, n.s);
       if (p && p.note.f === n.f) n.tie = true; else n.ghost = true;
     })));
-    return { song, warnings, systems: sysList.length, pages: doc.numPages, noStd: sysList.filter(s => !s.hasStd).length, debug: DBG || undefined };
+    return { song, warnings, source: PROF.name, systems: sysList.length, pages: doc.numPages, noStd: sysList.filter(s => !s.hasStd).length, debug: DBG || undefined };
   }
 
   // _test: 자동 테스트용 내부 함수 (앱에서는 쓰지 않음)
-  return { importPdf, _test: { readPage, findStaves, parseSystem, readRhythm, fitMeasure, quantizeBySpacing, restShape, flagCount, isDigit3, fillRatio, findTabRhythm, readTabRhythm, slashHeads, vecTimeSig, tempoUnit } };
+  return { importPdf, detectSource, registerClassifier, PROFILES, _test: { setProfile, symbolFeatures, classify, readPage, findStaves, parseSystem, readRhythm, fitMeasure, quantizeBySpacing, restShape, flagCount, isDigit3, fillRatio, findTabRhythm, readTabRhythm, slashHeads, vecTimeSig, tempoUnit } };
 })();
 
 if (typeof module !== 'undefined') module.exports = PdfImport;

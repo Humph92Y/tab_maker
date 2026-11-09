@@ -1,0 +1,310 @@
+{
+ "format": "tabmaker-gt/1",
+ "id": "scan/rand0-Leland-noisy",
+ "title": "scan/rand0-Leland-noisy",
+ "source": "scan",
+ "pdf": "rand0-Leland-scan-noisy.pdf",
+ "fields": [
+  "dur",
+  "rest",
+  "notes"
+ ],
+ "provenance": "tests/fixtures/rand0-Leland-s9.pdf 를 200dpi 그림으로 바꾼 스캔 시험 악보 (0.6도 기울임, 흐림, 잡티). 정답은 원래 시험 악보와 같음",
+ "measures": [
+  {
+   "n": 1,
+   "status": "verified",
+   "events": [
+    {
+     "on": 0,
+     "dur": 840,
+     "type": "note",
+     "notes": [
+      "1:5"
+     ]
+    },
+    {
+     "on": 840,
+     "dur": 120,
+     "type": "note",
+     "notes": [
+      "1:6"
+     ]
+    },
+    {
+     "on": 960,
+     "dur": 720,
+     "type": "rest"
+    },
+    {
+     "on": 1680,
+     "dur": 120,
+     "type": "rest"
+    },
+    {
+     "on": 1800,
+     "dur": 120,
+     "type": "rest"
+    }
+   ]
+  },
+  {
+   "n": 2,
+   "status": "verified",
+   "events": [
+    {
+     "on": 0,
+     "dur": 840,
+     "type": "rest"
+    },
+    {
+     "on": 840,
+     "dur": 120,
+     "type": "note",
+     "notes": [
+      "2:3"
+     ]
+    },
+    {
+     "on": 960,
+     "dur": 840,
+     "type": "rest"
+    },
+    {
+     "on": 1800,
+     "dur": 120,
+     "type": "note",
+     "notes": [
+      "1:8"
+     ]
+    }
+   ]
+  },
+  {
+   "n": 3,
+   "status": "verified",
+   "events": [
+    {
+     "on": 0,
+     "dur": 420,
+     "type": "note",
+     "notes": [
+      "2:8"
+     ]
+    },
+    {
+     "on": 420,
+     "dur": 60,
+     "type": "note",
+     "notes": [
+      "0:9"
+     ]
+    },
+    {
+     "on": 480,
+     "dur": 420,
+     "type": "rest"
+    },
+    {
+     "on": 900,
+     "dur": 60,
+     "type": "note",
+     "notes": [
+      "0:9"
+     ]
+    },
+    {
+     "on": 960,
+     "dur": 60,
+     "type": "note",
+     "notes": [
+      "2:6"
+     ]
+    },
+    {
+     "on": 1020,
+     "dur": 180,
+     "type": "note",
+     "notes": [
+      "0:8"
+     ]
+    },
+    {
+     "on": 1200,
+     "dur": 180,
+     "type": "note",
+     "notes": [
+      "0:1"
+     ]
+    },
+    {
+     "on": 1380,
+     "dur": 60,
+     "type": "note",
+     "notes": [
+      "2:1"
+     ]
+    },
+    {
+     "on": 1440,
+     "dur": 60,
+     "type": "note",
+     "notes": [
+      "2:6"
+     ]
+    },
+    {
+     "on": 1500,
+     "dur": 60,
+     "type": "note",
+     "notes": [
+      "2:9"
+     ]
+    },
+    {
+     "on": 1560,
+     "dur": 180,
+     "type": "note",
+     "notes": [
+      "2:5"
+     ]
+    },
+    {
+     "on": 1740,
+     "dur": 60,
+     "type": "note",
+     "notes": [
+      "2:3"
+     ]
+    },
+    {
+     "on": 1800,
+     "dur": 60,
+     "type": "note",
+     "notes": [
+      "0:3"
+     ]
+    },
+    {
+     "on": 1860,
+     "dur": 60,
+     "type": "rest"
+    }
+   ]
+  },
+  {
+   "n": 4,
+   "status": "verified",
+   "events": [
+    {
+     "on": 0,
+     "dur": 720,
+     "type": "note",
+     "notes": [
+      "1:6"
+     ]
+    },
+    {
+     "on": 720,
+     "dur": 120,
+     "type": "note",
+     "notes": [
+      "1:7"
+     ]
+    },
+    {
+     "on": 840,
+     "dur": 120,
+     "type": "note",
+     "notes": [
+      "1:10"
+     ]
+    },
+    {
+     "on": 960,
+     "dur": 960,
+     "type": "note",
+     "notes": [
+      "2:10"
+     ]
+    }
+   ]
+  },
+  {
+   "n": 5,
+   "status": "verified",
+   "events": [
+    {
+     "on": 0,
+     "dur": 1440,
+     "type": "note",
+     "notes": [
+      "1:9"
+     ]
+    },
+    {
+     "on": 1440,
+     "dur": 480,
+     "type": "note",
+     "notes": [
+      "2:3"
+     ]
+    }
+   ]
+  },
+  {
+   "n": 6,
+   "status": "verified",
+   "events": [
+    {
+     "on": 0,
+     "dur": 960,
+     "type": "rest"
+    },
+    {
+     "on": 960,
+     "dur": 60,
+     "type": "rest"
+    },
+    {
+     "on": 1020,
+     "dur": 60,
+     "type": "note",
+     "notes": [
+      "2:6"
+     ]
+    },
+    {
+     "on": 1080,
+     "dur": 240,
+     "type": "note",
+     "notes": [
+      "0:6"
+     ]
+    },
+    {
+     "on": 1320,
+     "dur": 120,
+     "type": "note",
+     "notes": [
+      "1:7"
+     ]
+    },
+    {
+     "on": 1440,
+     "dur": 360,
+     "type": "note",
+     "notes": [
+      "0:10"
+     ]
+    },
+    {
+     "on": 1800,
+     "dur": 120,
+     "type": "rest"
+    }
+   ]
+  }
+ ],
+ "expect": "unsupported"
+}
