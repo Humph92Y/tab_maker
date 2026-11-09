@@ -1,0 +1,47 @@
+{
+ "updated": "2026-11-09T08:04:48.589Z",
+ "docs": {
+  "scan/rand0-Leland-clean": {
+   "measures": 0,
+   "verified": 6,
+   "exactList": [],
+   "metrics": {
+    "restP": null,
+    "restR": 0,
+    "onsetP": null,
+    "onsetR": 0,
+    "durAcc": 0,
+    "notesAcc": null,
+    "typeAcc": null,
+    "techAcc": null,
+    "measureAcc": 0
+   },
+   "metaFail": [],
+   "checkCount": 0,
+   "current": {},
+   "error": "SCANNED",
+   "detected": null
+  },
+  "scan/rand0-Leland-noisy": {
+   "measures": 0,
+   "verified": 6,
+   "exactList": [],
+   "metrics": {
+    "restP": null,
+    "restR": 0,
+    "onsetP": null,
+    "onsetR": 0,
+    "durAcc": 0,
+    "notesAcc": null,
+    "typeAcc": null,
+    "techAcc": null,
+    "measureAcc": 0
+   },
+   "metaFail": [],
+   "checkCount": 0,
+   "current": {},
+   "error": "SCANNED",
+   "detected": null
+  }
+ }
+}

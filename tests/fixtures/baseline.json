@@ -1,0 +1,699 @@
+{
+ "updated": "2026-11-09T08:04:47.387Z",
+ "docs": {
+  "fixtures/chords-Bravura": {
+   "measures": 1,
+   "verified": 1,
+   "exactList": [
+    1
+   ],
+   "metrics": {
+    "restP": 1,
+    "restR": 1,
+    "onsetP": 1,
+    "onsetR": 1,
+    "durAcc": 1,
+    "notesAcc": 1,
+    "typeAcc": null,
+    "techAcc": null,
+    "measureAcc": 1
+   },
+   "metaFail": [],
+   "checkCount": 0,
+   "current": {
+    "1": "4724dd45a7"
+   },
+   "error": null,
+   "detected": "generic"
+  },
+  "fixtures/chords-Leland": {
+   "measures": 1,
+   "verified": 1,
+   "exactList": [
+    1
+   ],
+   "metrics": {
+    "restP": 1,
+    "restR": 1,
+    "onsetP": 1,
+    "onsetR": 1,
+    "durAcc": 1,
+    "notesAcc": 1,
+    "typeAcc": null,
+    "techAcc": null,
+    "measureAcc": 1
+   },
+   "metaFail": [],
+   "checkCount": 0,
+   "current": {
+    "1": "4724dd45a7"
+   },
+   "error": null,
+   "detected": "generic"
+  },
+  "fixtures/dots-Bravura": {
+   "measures": 4,
+   "verified": 4,
+   "exactList": [
+    1,
+    2,
+    3,
+    4
+   ],
+   "metrics": {
+    "restP": null,
+    "restR": null,
+    "onsetP": 1,
+    "onsetR": 1,
+    "durAcc": 1,
+    "notesAcc": 1,
+    "typeAcc": null,
+    "techAcc": null,
+    "measureAcc": 1
+   },
+   "metaFail": [],
+   "checkCount": 1,
+   "current": {
+    "1": "f4d2ea2535",
+    "2": "5dfcb7c0f0",
+    "3": "dcb3d99034",
+    "4": "f110e90ff3"
+   },
+   "error": null,
+   "detected": "generic"
+  },
+  "fixtures/dots-Leland": {
+   "measures": 4,
+   "verified": 4,
+   "exactList": [
+    1,
+    2,
+    3,
+    4
+   ],
+   "metrics": {
+    "restP": null,
+    "restR": null,
+    "onsetP": 1,
+    "onsetR": 1,
+    "durAcc": 1,
+    "notesAcc": 1,
+    "typeAcc": null,
+    "techAcc": null,
+    "measureAcc": 1
+   },
+   "metaFail": [],
+   "checkCount": 1,
+   "current": {
+    "1": "f4d2ea2535",
+    "2": "5dfcb7c0f0",
+    "3": "dcb3d99034",
+    "4": "f110e90ff3"
+   },
+   "error": null,
+   "detected": "generic"
+  },
+  "fixtures/durs-Bravura": {
+   "measures": 5,
+   "verified": 5,
+   "exactList": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "metrics": {
+    "restP": null,
+    "restR": null,
+    "onsetP": 1,
+    "onsetR": 1,
+    "durAcc": 1,
+    "notesAcc": 1,
+    "typeAcc": null,
+    "techAcc": null,
+    "measureAcc": 1
+   },
+   "metaFail": [],
+   "checkCount": 0,
+   "current": {
+    "1": "521076d6f6",
+    "2": "2529adf2c8",
+    "3": "36851d045d",
+    "4": "516976265b",
+    "5": "3308fd4185"
+   },
+   "error": null,
+   "detected": "generic"
+  },
+  "fixtures/durs-Leland": {
+   "measures": 5,
+   "verified": 5,
+   "exactList": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "metrics": {
+    "restP": null,
+    "restR": null,
+    "onsetP": 1,
+    "onsetR": 1,
+    "durAcc": 1,
+    "notesAcc": 1,
+    "typeAcc": null,
+    "techAcc": null,
+    "measureAcc": 1
+   },
+   "metaFail": [],
+   "checkCount": 0,
+   "current": {
+    "1": "521076d6f6",
+    "2": "2529adf2c8",
+    "3": "36851d045d",
+    "4": "516976265b",
+    "5": "3308fd4185"
+   },
+   "error": null,
+   "detected": "generic"
+  },
+  "fixtures/rand0-Bravura-s9": {
+   "measures": 6,
+   "verified": 6,
+   "exactList": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+   ],
+   "metrics": {
+    "restP": 1,
+    "restR": 1,
+    "onsetP": 1,
+    "onsetR": 1,
+    "durAcc": 1,
+    "notesAcc": 1,
+    "typeAcc": null,
+    "techAcc": null,
+    "measureAcc": 1
+   },
+   "metaFail": [],
+   "checkCount": 0,
+   "current": {
+    "1": "102b5bd0b4",
+    "2": "bb7e5ecbbb",
+    "3": "36c9151ad4",
+    "4": "67564928ee",
+    "5": "fd00db08fb",
+    "6": "9085c78bab"
+   },
+   "error": null,
+   "detected": "generic"
+  },
+  "fixtures/rand0-Leland-s9": {
+   "measures": 6,
+   "verified": 6,
+   "exactList": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+   ],
+   "metrics": {
+    "restP": 1,
+    "restR": 1,
+    "onsetP": 1,
+    "onsetR": 1,
+    "durAcc": 1,
+    "notesAcc": 1,
+    "typeAcc": null,
+    "techAcc": null,
+    "measureAcc": 1
+   },
+   "metaFail": [],
+   "checkCount": 0,
+   "current": {
+    "1": "102b5bd0b4",
+    "2": "bb7e5ecbbb",
+    "3": "36c9151ad4",
+    "4": "67564928ee",
+    "5": "fd00db08fb",
+    "6": "9085c78bab"
+   },
+   "error": null,
+   "detected": "generic"
+  },
+  "fixtures/rand1-Bravura-s9": {
+   "measures": 6,
+   "verified": 6,
+   "exactList": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+   ],
+   "metrics": {
+    "restP": 1,
+    "restR": 1,
+    "onsetP": 1,
+    "onsetR": 1,
+    "durAcc": 1,
+    "notesAcc": 1,
+    "typeAcc": null,
+    "techAcc": null,
+    "measureAcc": 1
+   },
+   "metaFail": [],
+   "checkCount": 0,
+   "current": {
+    "1": "eba9cfdcd2",
+    "2": "dd1132c34b",
+    "3": "f9728f3822",
+    "4": "e468efd005",
+    "5": "9b51023f88",
+    "6": "341c5d2dd0"
+   },
+   "error": null,
+   "detected": "generic"
+  },
+  "fixtures/rand1-Leland-s9": {
+   "measures": 6,
+   "verified": 6,
+   "exactList": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+   ],
+   "metrics": {
+    "restP": 1,
+    "restR": 1,
+    "onsetP": 1,
+    "onsetR": 1,
+    "durAcc": 1,
+    "notesAcc": 1,
+    "typeAcc": null,
+    "techAcc": null,
+    "measureAcc": 1
+   },
+   "metaFail": [],
+   "checkCount": 0,
+   "current": {
+    "1": "eba9cfdcd2",
+    "2": "dd1132c34b",
+    "3": "f9728f3822",
+    "4": "e468efd005",
+    "5": "9b51023f88",
+    "6": "341c5d2dd0"
+   },
+   "error": null,
+   "detected": "generic"
+  },
+  "fixtures/rand2-Bravura-s9": {
+   "measures": 6,
+   "verified": 6,
+   "exactList": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+   ],
+   "metrics": {
+    "restP": 1,
+    "restR": 1,
+    "onsetP": 1,
+    "onsetR": 1,
+    "durAcc": 1,
+    "notesAcc": 1,
+    "typeAcc": null,
+    "techAcc": null,
+    "measureAcc": 1
+   },
+   "metaFail": [],
+   "checkCount": 0,
+   "current": {
+    "1": "739c38dd89",
+    "2": "7be61e6e3c",
+    "3": "c6faac31be",
+    "4": "a7c16b01a0",
+    "5": "2c440b8d9d",
+    "6": "66ae3b1855"
+   },
+   "error": null,
+   "detected": "generic"
+  },
+  "fixtures/rand2-Leland-s9": {
+   "measures": 6,
+   "verified": 6,
+   "exactList": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+   ],
+   "metrics": {
+    "restP": 1,
+    "restR": 1,
+    "onsetP": 1,
+    "onsetR": 1,
+    "durAcc": 1,
+    "notesAcc": 1,
+    "typeAcc": null,
+    "techAcc": null,
+    "measureAcc": 1
+   },
+   "metaFail": [],
+   "checkCount": 0,
+   "current": {
+    "1": "739c38dd89",
+    "2": "7be61e6e3c",
+    "3": "c6faac31be",
+    "4": "a7c16b01a0",
+    "5": "2c440b8d9d",
+    "6": "66ae3b1855"
+   },
+   "error": null,
+   "detected": "generic"
+  },
+  "fixtures/rand3-Bravura-s9": {
+   "measures": 6,
+   "verified": 6,
+   "exactList": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+   ],
+   "metrics": {
+    "restP": 1,
+    "restR": 1,
+    "onsetP": 1,
+    "onsetR": 1,
+    "durAcc": 1,
+    "notesAcc": 1,
+    "typeAcc": null,
+    "techAcc": null,
+    "measureAcc": 1
+   },
+   "metaFail": [],
+   "checkCount": 0,
+   "current": {
+    "1": "dee5e43663",
+    "2": "099c6b53c6",
+    "3": "07d6153f62",
+    "4": "b6e28ac9b2",
+    "5": "2f573c9e18",
+    "6": "e8564507de"
+   },
+   "error": null,
+   "detected": "generic"
+  },
+  "fixtures/rand3-Leland-s9": {
+   "measures": 6,
+   "verified": 6,
+   "exactList": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+   ],
+   "metrics": {
+    "restP": 1,
+    "restR": 1,
+    "onsetP": 1,
+    "onsetR": 1,
+    "durAcc": 1,
+    "notesAcc": 1,
+    "typeAcc": null,
+    "techAcc": null,
+    "measureAcc": 1
+   },
+   "metaFail": [],
+   "checkCount": 0,
+   "current": {
+    "1": "dee5e43663",
+    "2": "099c6b53c6",
+    "3": "07d6153f62",
+    "4": "b6e28ac9b2",
+    "5": "2f573c9e18",
+    "6": "e8564507de"
+   },
+   "error": null,
+   "detected": "generic"
+  },
+  "fixtures/rests-Bravura": {
+   "measures": 6,
+   "verified": 6,
+   "exactList": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+   ],
+   "metrics": {
+    "restP": 1,
+    "restR": 1,
+    "onsetP": 1,
+    "onsetR": 1,
+    "durAcc": 1,
+    "notesAcc": 1,
+    "typeAcc": null,
+    "techAcc": null,
+    "measureAcc": 1
+   },
+   "metaFail": [],
+   "checkCount": 0,
+   "current": {
+    "1": "eba9cfdcd2",
+    "2": "226e61c1b1",
+    "3": "cd4bd5b9cc",
+    "4": "8511e8882b",
+    "5": "10292e3cd2",
+    "6": "6ae833227e"
+   },
+   "error": null,
+   "detected": "generic"
+  },
+  "fixtures/rests-Leland": {
+   "measures": 6,
+   "verified": 6,
+   "exactList": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+   ],
+   "metrics": {
+    "restP": 1,
+    "restR": 1,
+    "onsetP": 1,
+    "onsetR": 1,
+    "durAcc": 1,
+    "notesAcc": 1,
+    "typeAcc": null,
+    "techAcc": null,
+    "measureAcc": 1
+   },
+   "metaFail": [],
+   "checkCount": 0,
+   "current": {
+    "1": "eba9cfdcd2",
+    "2": "226e61c1b1",
+    "3": "cd4bd5b9cc",
+    "4": "8511e8882b",
+    "5": "10292e3cd2",
+    "6": "6ae833227e"
+   },
+   "error": null,
+   "detected": "generic"
+  },
+  "fixtures/ties-Bravura": {
+   "measures": 2,
+   "verified": 2,
+   "exactList": [
+    1,
+    2
+   ],
+   "metrics": {
+    "restP": null,
+    "restR": null,
+    "onsetP": 1,
+    "onsetR": 1,
+    "durAcc": 1,
+    "notesAcc": 1,
+    "typeAcc": null,
+    "techAcc": null,
+    "measureAcc": 1
+   },
+   "metaFail": [],
+   "checkCount": 0,
+   "current": {
+    "1": "44062b59f6",
+    "2": "198ed4777f"
+   },
+   "error": null,
+   "detected": "generic"
+  },
+  "fixtures/ties-Leland": {
+   "measures": 2,
+   "verified": 2,
+   "exactList": [
+    1,
+    2
+   ],
+   "metrics": {
+    "restP": null,
+    "restR": null,
+    "onsetP": 1,
+    "onsetR": 1,
+    "durAcc": 1,
+    "notesAcc": 1,
+    "typeAcc": null,
+    "techAcc": null,
+    "measureAcc": 1
+   },
+   "metaFail": [],
+   "checkCount": 0,
+   "current": {
+    "1": "44062b59f6",
+    "2": "198ed4777f"
+   },
+   "error": null,
+   "detected": "generic"
+  },
+  "fixtures/trip-Bravura": {
+   "measures": 2,
+   "verified": 2,
+   "exactList": [
+    1,
+    2
+   ],
+   "metrics": {
+    "restP": null,
+    "restR": null,
+    "onsetP": 1,
+    "onsetR": 1,
+    "durAcc": 1,
+    "notesAcc": 1,
+    "typeAcc": null,
+    "techAcc": null,
+    "measureAcc": 1
+   },
+   "metaFail": [],
+   "checkCount": 0,
+   "current": {
+    "1": "419e776db4",
+    "2": "6331301676"
+   },
+   "error": null,
+   "detected": "generic"
+  },
+  "fixtures/trip-Leland": {
+   "measures": 2,
+   "verified": 2,
+   "exactList": [
+    1,
+    2
+   ],
+   "metrics": {
+    "restP": null,
+    "restR": null,
+    "onsetP": 1,
+    "onsetR": 1,
+    "durAcc": 1,
+    "notesAcc": 1,
+    "typeAcc": null,
+    "techAcc": null,
+    "measureAcc": 1
+   },
+   "metaFail": [],
+   "checkCount": 0,
+   "current": {
+    "1": "419e776db4",
+    "2": "6331301676"
+   },
+   "error": null,
+   "detected": "generic"
+  },
+  "fixtures/ts34-Bravura": {
+   "measures": 3,
+   "verified": 3,
+   "exactList": [
+    1,
+    2,
+    3
+   ],
+   "metrics": {
+    "restP": 1,
+    "restR": 1,
+    "onsetP": 1,
+    "onsetR": 1,
+    "durAcc": 1,
+    "notesAcc": 1,
+    "typeAcc": null,
+    "techAcc": null,
+    "measureAcc": 1
+   },
+   "metaFail": [],
+   "checkCount": 0,
+   "current": {
+    "1": "4a375940a2",
+    "2": "f82f9d39bf",
+    "3": "6a3b92c8f3"
+   },
+   "error": null,
+   "detected": "generic"
+  },
+  "fixtures/ts34-Leland": {
+   "measures": 3,
+   "verified": 3,
+   "exactList": [
+    1,
+    2,
+    3
+   ],
+   "metrics": {
+    "restP": 1,
+    "restR": 1,
+    "onsetP": 1,
+    "onsetR": 1,
+    "durAcc": 1,
+    "notesAcc": 1,
+    "typeAcc": null,
+    "techAcc": null,
+    "measureAcc": 1
+   },
+   "metaFail": [],
+   "checkCount": 0,
+   "current": {
+    "1": "4a375940a2",
+    "2": "f82f9d39bf",
+    "3": "6a3b92c8f3"
+   },
+   "error": null,
+   "detected": "generic"
+  }
+ }
+}

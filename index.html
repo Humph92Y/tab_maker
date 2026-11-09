@@ -185,6 +185,11 @@
       <button id="bHelp" class="tall"><span class="ic">⌨</span>단축키 전체 보기</button>
       <button id="bTheory" class="tall"><span class="ic">🎵</span>음악 기초</button>
     </div><div class="rl">도움말 (F1)</div></div>
+    <div class="rg"><div class="rb col" title="켜 두면 PDF로 불러온 악보를 고친 부분을 이 기기에만 저장해요. 인터넷으로 보내지 않아요. 앱이 스스로 배우지는 않아요.">
+      <label><input type="checkbox" id="omrLogOn"> 수정 기록 남기기 (이 기기에만)</label>
+      <div><button id="bOmrExport">📤 수정 기록 내보내기</button> <button id="bOmrClear">🗑 기록 지우기</button></div>
+      <small id="omrLogCount"></small>
+    </div><div class="rl">PDF 인식 개선 자료</div></div>
     <div class="rg wide"><div class="rb col helptxt">
       <div>① 줄 위를 클릭 → ② 숫자(프렛) 입력 → ③ <b>Enter</b> = 저장하고 다음 칸으로</div>
       <div>숫자를 클릭하면 수정·삭제·손가락 색·주법 메뉴가 떠요. 숫자 <b>사이</b>에 마우스를 올리면 초록 선이 생기고, 누르면 새 칸이 끼워져요.</div>
@@ -427,6 +432,7 @@
 <script src="lib/pdf.min.js"></script>
 <script src="lib/pdf.worker.min.js"></script>
 <script src="js/pdfimport.js"></script>
+<script src="js/corrections.js"></script>
 <script src="js/musicxml.js"></script>
 <script>
   (function () { const s = document.getElementById('tuning'); for (const k in TUNINGS) { const o = document.createElement('option'); o.value = k; o.textContent = TUNINGS[k].name; s.appendChild(o); } })();

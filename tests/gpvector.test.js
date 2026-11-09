@@ -13,6 +13,8 @@ const ctx = { console, Math, JSON, Set, Map, module: {} };
 vm.createContext(ctx);
 vm.runInContext(fs.readFileSync(path.join(root, 'js/model.js'), 'utf8') + ';\n' + fs.readFileSync(path.join(root, 'js/pdfimport.js'), 'utf8') + ';this.P = PdfImport;', ctx);
 const { readRhythm, fitMeasure, slashHeads, vecTimeSig, tempoUnit, findStaves } = ctx.P._test;
+// 이 파일은 Guitar Pro 전용 규칙을 시험하므로 Guitar Pro 프로필로 실행
+ctx.P._test.setProfile('guitarpro');
 
 const SP = 5;
 const ST = { type: 'std', lines: [220, 215, 210, 205, 200], top: 220, bottom: 200, sp: SP, x0: 20, x1: 400 };

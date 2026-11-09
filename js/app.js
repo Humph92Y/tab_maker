@@ -971,9 +971,11 @@ $('pdfInput').onchange = async e => {
     if (!window.pdfjsLib) throw new Error('NO_LIB');
     if (window.pdfjsLib.GlobalWorkerOptions) window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'lib/pdf.worker.min.js';
     const buf = new Uint8Array(await f.arrayBuffer());
+    const copy = OmrLog.isOn() ? buf.slice() : null; // pdf.js 가 원본 버퍼를 넘겨받아 비우므로 수정 기록용 사본
     const r = await PdfImport.importPdf(window.pdfjsLib, buf, (p, n) => { bt.textContent = `악보 인식 중... (${p} / ${n} 페이지)`; });
     snapshot();
     song = fixSong(r.song); sel = { mi: 0, bi: 0, s: 0 };
+    if (copy) { await OmrLog.recordImport(song, copy, { source: r.source, pages: r.pages }); syncOmrLog(); }
     changed(true);
     const chk = song.measures.filter(m => m.check).length;
     status(`"${song.title}" 악보를 불러왔어요: ${song.measures.length}마디. ${chk ? `⚠ 표시된 ${chk}마디는 원본과 한 번 비교해 주세요.` : '모든 마디의 박자가 맞아요.'}`);
@@ -984,6 +986,23 @@ $('pdfInput').onchange = async e => {
     alert(msg); status('PDF 인식 실패', true);
   } finally { busy.classList.add('hidden'); }
 };
+
+// ---------- PDF 인식 수정 기록 (켰을 때만, 이 기기에만) ----------
+function syncOmrLog() { $('omrLogOn').checked = OmrLog.isOn(); $('omrLogCount').textContent = OmrLog.count() ? `저장된 기록 ${OmrLog.count()}개` : '저장된 기록 없음'; }
+$('omrLogOn').onchange = e => {
+  if (e.target.checked && !confirm('PDF로 불러온 악보를 고치면, 처음 인식 결과와 고친 결과를 이 기기에만 저장해요.\n\n· 인터넷으로 보내지 않아요\n· 곡 제목·파일 이름은 저장하지 않아요\n· [수정 기록 내보내기]로 만든 파일을 직접 전달할 때만 밖으로 나가요\n· 앱이 이 기록으로 스스로 배우지는 않아요 (인식 개선 시험 자료로 쓰여요)\n\n켤까요?')) { e.target.checked = false; return; }
+  OmrLog.setOn(e.target.checked); syncOmrLog();
+  status(e.target.checked ? '이제부터 PDF를 불러오면 수정 기록을 남겨요 (이 기기에만)' : '수정 기록을 껐어요. 이미 저장된 기록은 [기록 지우기]로 지울 수 있어요');
+};
+$('bOmrExport').onclick = () => {
+  const d = OmrLog.diff(song);
+  if (!d) return alert('지금 악보에는 수정 기록이 없어요.\n[수정 기록 남기기]를 켠 뒤 PDF를 불러와서 고친 악보만 내보낼 수 있어요.');
+  if (!d.corrections.length) return alert('PDF에서 불러온 뒤 고친 마디가 아직 없어요.');
+  downloadBlob(new Blob([JSON.stringify(d, null, 1)], { type: 'application/json' }), 'pdf-수정기록-' + d.created.slice(0, 10) + '.json');
+  status(`고친 마디 ${d.corrections.length}개를 파일로 내보냈어요`);
+};
+$('bOmrClear').onclick = () => { if (!OmrLog.count()) return status('지울 기록이 없어요'); if (confirm('이 기기에 저장된 PDF 수정 기록을 모두 지울까요?')) { OmrLog.clear(); syncOmrLog(); status('수정 기록을 지웠어요'); } };
+syncOmrLog();
 
 // ---------- 재생 ----------
 let rafId = null;
