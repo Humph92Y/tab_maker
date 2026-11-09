@@ -7,6 +7,24 @@ const Player = (() => {
   let tones = {}, curTone = 'clean', curFx = null;
   const bufCache = {};
   let sources = [], timers = [], playing = false;
+  // 재생할 음은 미리 목록(queue)에만 적어 두고, 곧 울릴 음(앞으로 2초)만 그때그때 소리 장치로 만듦.
+  //  (긴 곡의 음 수천 개를 한꺼번에 만들면 기기가 버거워서 소리가 끊기거나 지글거림)
+  let queue = [], pumpTimer = null;
+  const AHEAD = 2.0;
+  function pump() {
+    if (!ctx) return;
+    const offline = typeof ctx.startRendering === 'function'; // 자동 테스트(오프라인 렌더링)에서는 한 번에
+    const until = ctx.currentTime + AHEAD;
+    let k = 0;
+    while (k < queue.length && (offline || queue[k].t0 < until)) k++;
+    const now = queue.splice(0, k);
+    now.forEach(voice);
+  }
+  function enqueue(v) {
+    // t0 순서로 끼워 넣기 (거의 항상 맨 뒤)
+    let i = queue.length; while (i > 0 && queue[i - 1].t0 > v.t0) i--;
+    queue.splice(i, 0, v);
+  }
   let passes = []; // {start, beats:[{id,t,d}], end}
   let onStop = null;
 
@@ -31,7 +49,11 @@ const Player = (() => {
     ctx = new (window.AudioContext || window.webkitAudioContext)();
     master = ctx.createGain(); master.gain.value = volume;
     const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 4;
-    master.connect(comp); comp.connect(ctx.destination);
+    // 마지막 안전장치: 화음이 많이 겹쳐도 소리가 찢어지지(클리핑) 않도록
+    //  ① 빠른 리미터로 큰 소리를 누르고 ② 그래도 넘치는 부분은 부드럽게 둥글게 깎음 (최대 ±1 안쪽)
+    const lim = ctx.createDynamicsCompressor(); lim.threshold.value = -3; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0.001; lim.release.value = 0.08;
+    const soft = ctx.createWaveShaper(); soft.curve = softClip(); soft.oversample = '2x';
+    master.connect(comp); comp.connect(lim); lim.connect(soft); soft.connect(ctx.destination);
     // 리버브(공간감)
     const conv = ctx.createConvolver(); conv.buffer = makeImpulse(2.2);
     reverbSend = ctx.createGain(); reverbRet = ctx.createGain(); reverbRet.gain.value = 0;
@@ -104,6 +126,12 @@ const Player = (() => {
   function distCurve(k, bias) {
     const n = 4096, c = new Float32Array(n), b = bias || 0, off = Math.tanh(k * b);
     for (let i = 0; i < n; i++) { const x = i * 2 / n - 1; c[i] = (Math.tanh(k * (x + b)) - off) / Math.tanh(k); }
+    return c;
+  }
+  // 0.7까지는 그대로, 그 위는 tanh 로 부드럽게 눌러서 1을 넘지 않게
+  function softClip() {
+    const n = 4096, c = new Float32Array(n), th = 0.7;
+    for (let i = 0; i < n; i++) { const x = i * 2 / n - 1, a = Math.abs(x); c[i] = a <= th ? x : Math.sign(x) * (th + (1 - th) * Math.tanh((a - th) / (1 - th))); }
     return c;
   }
   function makeImpulse(sec) {
@@ -213,11 +241,12 @@ const Player = (() => {
       ordered.forEach((n, k) => {
         if (consumed.has(n.id)) return;
         const st = bt + k * strum;
-        let vel = 0.55 * (n.ghost ? 0.45 : 1) * (n.acc ? 1.35 : 1);
+        // 화음은 줄 수가 많을수록 한 줄씩은 조금 작게 (6줄 화음이 단음보다 몇 배 크게 터지지 않도록)
+        let vel = 0.55 * (n.ghost ? 0.45 : 1) * (n.acc ? 1.35 : 1) / Math.sqrt(Math.max(1, b.notes.length / 2));
         let midi = tuning[n.s] + n.f;
         const v = { t0: st, t1: bt + bd, midi, events: [], vel, startSemi: 0 };
-        if (n.dead) { v.t1 = st + 0.05; v.filter = { type: 'lowpass', freq: 1200 }; v.vel *= 0.8; voice(v); return; }
-        if (n.harm) { v.midi = tuning[n.s] + (harmOffset[n.f] || 12); v.filter = { type: 'highpass', freq: 900 }; v.vel *= 0.7; v.t1 = bt + bd + 1.2; voice(v); return; }
+        if (n.dead) { v.t1 = st + 0.05; v.filter = { type: 'lowpass', freq: 1200 }; v.vel *= 0.8; enqueue(v); return; }
+        if (n.harm) { v.midi = tuning[n.s] + (harmOffset[n.f] || 12); v.filter = { type: 'highpass', freq: 900 }; v.vel *= 0.7; v.t1 = bt + bd + 1.2; enqueue(v); return; }
         if (n.pm) { v.filter = { type: 'lowpass', freq: 750 }; v.decay = 0.09; }
         if (n.slide === 'in') { v.startSemi = -4; for (let s = -3; s <= 0; s++) v.events.push({ t: st + (s + 4) * 0.02, semi: s }); }
         // 레가토 체인 따라가기
@@ -261,11 +290,12 @@ const Player = (() => {
         if (n.lr) { const nxs = nextOnString(song, curMi, curBi, n.s); endT = nxs && index.has(nxs.beat.id) ? t0 + tk(flat[index.get(nxs.beat.id)].onset - base) : endT + 2.5; }
         v.t1 = endT;
         if (n.stac) v.t1 = st + Math.max(0.05, Math.min(endT - st, bd * 0.45)); // 스타카토: 짧게 끊기
-        voice(v);
+        enqueue(v);
       });
     });
     const total = tk(endTick);
     passes.push({ start: t0, end: t0 + total, beats });
+    pump();
     return total;
   }
 
@@ -274,6 +304,7 @@ const Player = (() => {
     if (ctx.state === 'suspended') ctx.resume();
     setTone(song.tone); setFx(song.fx, song.bpm * opts.speed);
     playing = true; onStop = stopCb;
+    clearInterval(pumpTimer); pumpTimer = setInterval(pump, 250);
     let t = ctx.currentTime + 0.15;
     if (opts.countIn) {
       const ts = measureTs(song, opts.from), spq = 60 / (song.bpm * opts.speed), unit = spq * 4 / ts[1];
@@ -292,6 +323,7 @@ const Player = (() => {
 
   function stop(silent) {
     timers.forEach(clearTimeout); timers = [];
+    clearInterval(pumpTimer); pumpTimer = null; queue = [];
     sources.forEach(s => { try { s.stop(); } catch (e) { } }); sources = [];
     passes = [];
     const was = playing; playing = false;
