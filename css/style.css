@@ -35,6 +35,7 @@ svg.system { display: block; margin: 0 0 4px; user-select: none; overflow: visib
 .section { font: italic 700 12px Georgia, serif; fill: #333; }
 .fret { font: 700 13px Arial, sans-serif; text-anchor: middle; }
 .fret.grace { font-size: 10px; }
+.fret.slash { font-style: italic; fill-opacity: .55; } /* 원본의 리듬 빗금(/) = 앞 화음 다시 치기 */
 .fret.sel { text-decoration: underline; }
 .fret.pend { fill: #1d6fe0; }
 .fnum { font: 700 8px Arial; text-anchor: end; }
