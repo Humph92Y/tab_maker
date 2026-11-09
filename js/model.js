@@ -33,6 +33,8 @@ function newSong() {
 }
 
 function beatTicks(b) { if (b.grace) return 0; let t = TICKS[b.dur]; if (b.dot === 2) t *= 1.75; else if (b.dot) t *= 1.5; if (b.trip) t = t * 2 / 3; return t; }
+// 템포 표기: 원본이 8분음표(♪) 등 다른 음표 기준이면 그대로 보여 줌. 앱 안의 song.bpm 은 항상 4분음표 기준
+function tempoText(song) { const t = song.tempoMark; if (t && t.value) return `${{ 2: '𝅗𝅥', 4: '♩', 8: '♪', 16: '𝅘𝅥𝅯' }[t.unit] || '♩'}${t.dot ? '.' : ''} = ${t.value}`; return `♩ = ${song.bpm}`; }
 function isRest(b) { return !b.notes || b.notes.length === 0; }
 function measureTs(song, mi) { for (let i = mi; i >= 0; i--) if (song.measures[i].ts) return song.measures[i].ts; return song.ts; }
 function measureCapacity(ts) { return ts[0] * 1920 / ts[1]; }

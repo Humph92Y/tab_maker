@@ -36,7 +36,12 @@ const MusicXML = (function () {
         o += `</attributes>\n`;
         prevTs = ts;
       }
-      if (mi === 0) o += `<direction placement="above"><direction-type><metronome><beat-unit>quarter</beat-unit><per-minute>${song.bpm}</per-minute></metronome></direction-type><sound tempo="${song.bpm}"/></direction>\n`;
+      if (mi === 0) {
+        // 원본 템포 표기(예: ♪ = 154)가 있으면 그대로, 소리 빠르기(sound tempo)는 4분음표 기준
+        const tm = song.tempoMark && song.tempoMark.value ? song.tempoMark : null;
+        const unit = tm ? ({ 2: 'half', 4: 'quarter', 8: 'eighth', 16: '16th' }[tm.unit] || 'quarter') : 'quarter';
+        o += `<direction placement="above"><direction-type><metronome><beat-unit>${unit}</beat-unit>${tm && tm.dot ? '<beat-unit-dot/>' : ''}<per-minute>${tm ? tm.value : song.bpm}</per-minute></metronome></direction-type><sound tempo="${song.bpm}"/></direction>\n`;
+      }
       if (m.section) o += `<direction placement="above"><direction-type><rehearsal>${x(m.section)}</rehearsal></direction-type></direction>\n`;
       if (!m.beats.length) { o += `<note><rest measure="yes"/><duration>${measureCapacity(ts)}</duration><voice>1</voice></note>\n`; }
       m.beats.forEach((b, bi) => {
@@ -54,7 +59,7 @@ const MusicXML = (function () {
           let t = `<note>${b.grace ? '<grace slash="yes"/>' : ''}${k ? '<chord/>' : ''}${pitchXml(midi)}${common()}`;
           if (n.tie) t += `<tie type="stop"/>`; if (tieStart.has(n.id)) t += `<tie type="start"/>`;
           t += after();
-          if (n.dead) t += `<notehead>x</notehead>`; else if (n.ghost) t += `<notehead parentheses="yes">normal</notehead>`;
+          if (n.dead) t += `<notehead>x</notehead>`; else if (n.ghost) t += `<notehead parentheses="yes">normal</notehead>`; else if (b.slash) t += `<notehead>slash</notehead>`;
           // notations
           let nt = '', tech = `<string>${n.s + 1}</string><fret>${n.f}</fret>`, orn = '', art = '';
           if (n.tie) nt += `<tied type="stop"/>`; if (tieStart.has(n.id)) nt += `<tied type="start"/>`;
@@ -131,7 +136,14 @@ const MusicXML = (function () {
         } else if (tag === 'direction') {
           const rh = el.getElementsByTagName('rehearsal')[0]; if (rh && !m.section) m.section = rh.textContent.trim();
           const snd = kid(el, 'sound'); if (snd && snd.getAttribute('tempo') && mIdx === 0) song.bpm = Math.round(+snd.getAttribute('tempo'));
-          const pm = el.getElementsByTagName('per-minute')[0]; if (pm && mIdx === 0 && !(snd && snd.getAttribute('tempo'))) song.bpm = Math.round(parseFloat(pm.textContent)) || song.bpm;
+          const pm = el.getElementsByTagName('per-minute')[0];
+          if (pm && mIdx === 0) {
+            // 기준 음표가 4분음표가 아니면(♪ = 154 등) 원래 표기를 기억하고, 앱 빠르기는 4분음표 기준으로 환산
+            const buEl = el.getElementsByTagName('beat-unit')[0], bu = buEl ? buEl.textContent.trim() : '', dotted = el.getElementsByTagName('beat-unit-dot').length > 0, val = parseFloat(pm.textContent);
+            const unit = { half: 2, quarter: 4, eighth: 8, '16th': 16 }[bu] || 4;
+            if (val && (unit !== 4 || dotted)) { song.tempoMark = { unit, dot: dotted, value: Math.round(val) }; if (!(snd && snd.getAttribute('tempo'))) song.bpm = Math.round(val * 4 / unit * (dotted ? 1.5 : 1)); }
+            else if (!(snd && snd.getAttribute('tempo'))) song.bpm = Math.round(val) || song.bpm;
+          }
         } else if (tag === 'sound' && el.getAttribute('tempo') && mIdx === 0) song.bpm = Math.round(+el.getAttribute('tempo'));
         else if (tag === 'print' && el.getAttribute('new-system') === 'yes' && mIdx > 0) m.brk = true;
         else if (tag === 'note') {
@@ -161,6 +173,7 @@ const MusicXML = (function () {
           n._midi = midi;
           const nh = txt(el, 'notehead'); const nhEl = kid(el, 'notehead');
           if (nh === 'x') n.dead = true; else if (nhEl && nhEl.getAttribute('parentheses') === 'yes') n.ghost = true;
+          if (nh === 'slash' && lastBeat) lastBeat.slash = true; // 리듬 빗금 = 앞 화음 다시 치기
           if (kids(el, 'tie').some(t => t.getAttribute('type') === 'stop') || Array.from(el.getElementsByTagName('tied')).some(t => t.getAttribute('type') === 'stop')) n.tie = true;
           const nots = kid(el, 'notations');
           if (nots) {

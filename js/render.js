@@ -142,7 +142,7 @@ function renderScore(el, song, st) {
           const isFrom = st.mode && st.mode.from && st.mode.from.id === n.id;
           o += `<rect x="${cx - tw / 2}" y="${y - 7}" width="${tw}" height="14" class="nbg${isFrom ? ' from' : ''}"/>`;
           if (fg && view.fingers !== undefined) o += `<rect x="${cx - tw / 2 - 1}" y="${y - 8}" width="${tw + 2}" height="16" rx="4" fill="${color}" fill-opacity="0.13"/>`;
-          o += `<text x="${cx}" y="${y + 4.5}" class="fret${isSel ? ' sel' : ''}${b.grace ? ' grace' : ''}" fill="${color}">${esc(lab)}</text>`;
+          o += `<text x="${cx}" y="${y + 4.5}" class="fret${isSel ? ' sel' : ''}${b.grace ? ' grace' : ''}${b.slash ? ' slash' : ''}" fill="${color}">${esc(lab)}${b.slash ? '<title>빗금(/) 자리: 앞 화음을 이 리듬으로 다시 쳐요</title>' : ''}</text>`;
           if (view.fingerNums && fg) o += `<text x="${cx - tw / 2 - 2}" y="${y - 3}" class="fnum" fill="${color}">${fg}</text>`;
           if (view.names && !n.dead) o += `<text x="${cx + tw / 2 + 1}" y="${y + 3}" class="nname">${midiName(tuning[n.s] + n.f, false)}</text>`;
           if (n.acc) o += `<text x="${cx}" y="${R.line0 - 13}" class="tech mid">&gt;</text>`;

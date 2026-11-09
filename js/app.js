@@ -727,7 +727,7 @@ function syncToolbar() {
   $('pickMode').value = song.view.pickMode || 'rhythm';
   $('vNames').checked = !!song.view.names; $('vFnums').checked = !!song.view.fingerNums;
   $('perLine').value = String(song.view.perLine || 0);
-  $('printSub').textContent = [`♩ = ${song.bpm}`, `튜닝: ${TUNINGS[song.tuning].name}`].filter(Boolean).join('   ·   ');
+  $('printSub').textContent = [tempoText(song), `튜닝: ${TUNINGS[song.tuning].name}`].filter(Boolean).join('   ·   ');
 }
 function updateDurButtons() {
   const b = curBeat(); const d = b ? b.dur : inputDur;
@@ -745,7 +745,7 @@ function updateLegend() {
 
 $('title').addEventListener('change', e => mutate(() => { song.title = e.target.value || '제목 없음'; syncToolbar(); }));
 $('artist').addEventListener('change', e => mutate(() => { song.artist = e.target.value; syncToolbar(); }));
-$('bpm').addEventListener('change', e => mutate(() => { song.bpm = Math.max(20, Math.min(400, +e.target.value || 100)); syncToolbar(); }));
+$('bpm').addEventListener('change', e => mutate(() => { song.bpm = Math.max(20, Math.min(400, +e.target.value || 100)); delete song.tempoMark; syncToolbar(); }));
 $('ts0').addEventListener('change', e => mutate(() => { song.ts = [+$('ts0').value, +$('ts1').value]; }));
 $('ts1').addEventListener('change', e => mutate(() => { song.ts = [+$('ts0').value, +$('ts1').value]; }));
 $('tuning').addEventListener('change', e => mutate(() => { song.tuning = e.target.value; syncToolbar(); }));
@@ -977,7 +977,7 @@ $('pdfInput').onchange = async e => {
     changed(true);
     const chk = song.measures.filter(m => m.check).length;
     status(`"${song.title}" 악보를 불러왔어요: ${song.measures.length}마디. ${chk ? `⚠ 표시된 ${chk}마디는 원본과 한 번 비교해 주세요.` : '모든 마디의 박자가 맞아요.'}`);
-    alert(`✅ PDF 인식 완료\n\n제목: ${song.title}\n마디: ${song.measures.length}개\n빠르기: ${song.bpm} BPM\n\n${chk ? `⚠ 주황색 마디 번호(${chk}개)는 박자 합이 안 맞거나 일부 길이를 추측한 곳이에요.\n원본에서 읽은 길이는 그대로 두었으니, 원본과 비교해서 필요하면 고쳐 주세요.` : '모든 마디의 박자가 맞아요.'}\n\n(되돌리려면 Ctrl+Z)`);
+    alert(`✅ PDF 인식 완료\n\n제목: ${song.title}\n마디: ${song.measures.length}개\n빠르기: ${tempoText(song)}${song.tempoMark ? ` (4분음표 기준 ${song.bpm} BPM)` : ' BPM'}\n박자: ${song.ts[0]}/${song.ts[1]} · 튜닝: ${TUNINGS[song.tuning].name}\n\n${chk ? `⚠ 주황색 마디 번호(${chk}개)는 박자 합이 안 맞거나 일부 길이를 추측한 곳이에요.\n원본에서 읽은 길이는 그대로 두었으니, 원본과 비교해서 필요하면 고쳐 주세요.` : '모든 마디의 박자가 맞아요.'}\n\n(되돌리려면 Ctrl+Z)`);
   } catch (err) {
     console.error(err);
     const msg = err && err.message === 'SCANNED' ? '이 PDF는 악보가 사진(그림)으로 들어 있어요. (스캔·사진 PDF)\n지금은 글자·선으로 된 PDF만 정확히 읽을 수 있어요.\nGuitar Pro, MuseScore 등에서 "PDF로 내보내기"한 파일을 써 주세요.' : err && err.message === 'NO_TAB' ? '이 PDF에서 타브(6줄) 악보를 찾지 못했어요.\n스캔하거나 사진으로 찍은 PDF는 아직 인식할 수 없어요.\n(Guitar Pro, MuseScore 등에서 내보낸 PDF는 인식돼요)' : '이 PDF를 읽지 못했어요. (' + (err && err.message) + ')';
